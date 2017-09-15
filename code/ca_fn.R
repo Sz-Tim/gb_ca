@@ -15,22 +15,27 @@
 ##---
   run_sim <- function(lc.df, N.init, K, fec, pr.f, pr.eat, sdd.pr, sdd.rate, 
                       n.ldd, pr.est, tmax, stoch=FALSE) {
-    
-    require(tidyverse); require(magrittr)
     # Runs the simulation, calling subsequent submodules
+    require(tidyverse); require(magrittr)
+    
     # 1. Initialize populations
     ncell <- nrow(lc.df)
     N <- matrix(0, ncell, tmax)
     N[,1] <- N.init
+    
     for(t in 2:tmax) {
       # 2. Local fruit production
       N.f <- make_fruits(lc.df, N[,t], N.recruit[,t-1], fec, pr.f, stoch=stoch)
+      
       # 3. Short distance dispersal
       N.seed <- sdd_disperse(lc.df, N.f, sdd.probs, bird.pref, pr.eat)
+      
       # 4. Long distance dispersal
       N.seed <- ldd_disperse(lc.df, N[,t], N.seed, n.ldd)
+      
       # 5. Seedling establishment
       N.recruit[,t] <- new_seedlings(lc.df, N.seed, pr.est)
+      
       # 6. Carrying capacity enforcement on adults
       N[,t] <- pmin(N[,t], K)
       N[,t+1] <- N[,t] + N.recruit[,t]
