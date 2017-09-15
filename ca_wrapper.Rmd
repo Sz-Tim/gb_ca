@@ -61,7 +61,7 @@ source("code/ca_fn.R")
   # populations
   N.init <- rep(0, ncell)
   p.0 <- sample(1:ncell, N.p.t0)
-  N.init[pop.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (K/2)) %>% ceiling
+  N.init[p.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (K/2)) %>% ceiling
   
   # dispersal probabilities
   sdd.pr <- sdd_set_probs(lc.df, sdd.max, sdd.rate, bird.pref)
