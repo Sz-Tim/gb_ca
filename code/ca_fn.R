@@ -87,7 +87,8 @@
       }
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbound neighbors
-      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.pref[lc.df[sdd.i[,,2,n][ib], 3]]
+      sdd.i[,,1,n][ib] <- d.pr[ib] * 
+        (as.matrix(lc.df[sdd.i[,,2,n][ib], 3:8]) %*% bird.pref)
       sdd.i[,,1,n] <- sdd.i[,,1,n]/sum(sdd.i[,,1,n])
     }
     
