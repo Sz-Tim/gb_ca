@@ -13,19 +13,10 @@
 ##---
 ## simulation wrapper
 ##---
-  run_sim <- function(
-    lc.df,
-    N.init,
-    fec,
-    K,
-    sdd.probs,
-    sdd.rate,
-    bird.pref,
-    pr.eat,
-    n.ldd,
-    pr.est,
-    tmax
-  ) {
+  run_sim <- function(lc.df, N.init, K, fec, pr.f, pr.eat, sdd.pr, sdd.rate, 
+                      n.ldd, pr.est, tmax, stoch=FALSE) {
+    
+    require(tidyverse); require(magrittr)
     # Runs the simulation, calling subsequent submodules
     # 1. Initialize populations
     ncell <- nrow(lc.df)
@@ -33,7 +24,7 @@
     N[,1] <- N.init
     for(t in 2:tmax) {
       # 2. Local fruit production
-      N.f <- make_fruits(lc.df, N[,t], N.recruit[,t-1], fec, K)
+      N.f <- make_fruits(lc.df, N[,t], N.recruit[,t-1], fec, pr.f, stoch=stoch)
       # 3. Short distance dispersal
       N.seed <- sdd_disperse(lc.df, N.f, sdd.probs, bird.pref, pr.eat)
       # 4. Long distance dispersal
@@ -109,7 +100,6 @@
     #   col(id, N.rpr=num.reproducing, N.fruit=total.fruit)
     #   nrow = sum(N.frt != 0)
     
-
     if(stoch) {
       N.f <- tibble(id=which(N.t>0)) %>%
         mutate(N.rpr=rbinom(n(), N[id]-N.recruit[id],
@@ -125,7 +115,6 @@
                           as.matrix(lc.df[id,3:8]) %*% fec) %>% ceiling) %>% 
         filter(N.fruit > 0)
     }
-  
     return(N.f)
   }
 
@@ -134,13 +123,16 @@
 ##---
 ## short distance dispersal
 ##---
-  sdd_disperse <- function(lc.df, N.f, sdd.probs, bird.pref, pr.eat) {
-    # Calculate (N.seeds | N.fruit, sdd.probs, bird.pref, pr.eaten)
+  sdd_disperse <- function(lc.df, N.f, sdd.probs, pr.eat) {
+    # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
     # Returns sparse matrix N.sdd with:
     #   cols(cell.ID, (N.seed = 2*(N.fruit - N.eaten + N.deposited)))
     #   nrow = sum(N.seed != 0)
+    
+    
+    
     return(N.seed)
   }
 
