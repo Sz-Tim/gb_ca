@@ -8,6 +8,8 @@ output: html_document
 # readme  
 This is a wrapper for running the glossy buckthorn cellular automata model. It sets up the environment, allows the assignment of all necessary parameters, runs the simulation, and visualizes the results.
 
+The land cover within each cell is compositional rather than the more common hard classification. As a result, all land cover-specific parameters are computed proportionally to the land cover in a cell (i.e., lc.prop %*% K, where lc.prop is a matrix with columns for land cover and a row for each cell, and K is a vector of carrying capacities with one per land cover type).
+
 ```{r setup, include=FALSE}
 if(!require(sevcheck)) devtools::install_github("Sz-Tim/sevcheck")
 p_load("tidyverse", "doParallel", "magrittr")
