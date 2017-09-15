@@ -1,0 +1,71 @@
+---
+title: "Glossy Buckthorn CA"
+author: "Tim Szewczyk"
+date: "9/15/2017"
+output: html_document
+---
+
+# readme  
+This is a wrapper for running the glossy buckthorn cellular automata model. It sets up the environment, allows the assignment of all necessary parameters, runs the simulation, and visualizes the results.
+
+```{r setup, include=FALSE}
+if(!require(sevcheck)) devtools::install_github("Sz-Tim/sevcheck")
+p_load("tidyverse", "doParallel", "magrittr")
+theme_set(theme_bw()); registerDoParallel(makeCluster(2))
+source("code/ca_fn.R")
+```
+
+
+```{r setPars}
+##---
+## set parameters
+##---
+
+  # simulation
+  tmax <- 10  # num time steps per simulation
+  n.sim <- 5  # num simulations
+  
+  # landscape
+  lc.r <- 6  # num rows in landscape
+  lc.c <- 6  # num columns in landscape
+  n.lc <- 6  # num land cover categories
+  N.pop.t0 <- 5  # num cells with buckthorn at t=1
+  
+  # demography
+  K <- sample(20:50, n.lc)  # carrying capacity for adults in each lc
+  fec <- rnorm(n.lc, 100, 10)  # mean(fruit per adult) in each lc
+  pr.est <- rbeta(n.lc, 2, 20)  # pr(seedling establishment) in each lc
+  
+  # dispersal
+  sdd.max <- 2  # maximum dispersal distance (in cells)
+  sdd.rate <- 3.5  # 1/mn for dispersal kernel
+  bird.pref <- runif(n.lc) %>% divide_by(sum(.))  # bird habitat relative prefs
+  pr.eat <- rbeta(n.lc, 1.5, 2)  # prop fruits eaten by birds
+  n.ldd <- 1  # num long distance dispersal events per year
+  
+
+##--
+## initialize landscape
+##--
+  
+  # land cover
+  ncell <- lc.r*lc.c
+  lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r), 
+                 lc=sample(1:6, ncell, replace=TRUE))
+  
+  # populations
+  N.init <- rep(0, ncell)
+  pop.0 <- sample(1:ncell, N.pop.t0)
+  N.init[pop.0] <- (K[lc.df[pop.0,"lc"]]/2) %>% ceiling
+  
+  # dispersal probabilities
+  sdd.pr <- sdd_set_probs(lc.df, sdd.max, sdd.rate, bird.pref)
+```
+
+```{r runSim}
+
+for(s in 1:n.sim) {
+  
+}
+```
+
