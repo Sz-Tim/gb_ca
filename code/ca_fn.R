@@ -100,16 +100,32 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(lc.df, N, N.recruit, fec, K) {
+  make_fruits <- function(lc.df, N.t, N.recruit, fec, pr.f, stoch=FALSE) {
     # Calculate (N.fruit | N, fec, K) for each cell
     # Fecundity rates & fruiting probabilities are habitat specific
     # Assumes no fruit production in first year
     # N.fruit = (N-N.recruit)*pr(Fruit)*fec
-    # Returns sparse matrix N.f with:
-    #   col(cell.ID, N.fruit)
-    #   nrow = sum(N.fruit != 0)
+    # Returns sparse dataframe N.f with:
+    #   col(id, N.rpr=num.reproducing, N.fruit=total.fruit)
+    #   nrow = sum(N.frt != 0)
     
-    
+
+    if(stoch) {
+      N.f <- tibble(id=which(N.t>0)) %>%
+        mutate(N.rpr=rbinom(n(), N[id]-N.recruit[id],
+                            prob=as.matrix(lc.df[id,3:8]) %*% pr.f),
+               N.fruit=rpois(n(), 
+                             lambda=as.matrix(lc.df[id,3:8]) %*% fec)) %>% 
+        filter(N.fruit > 0)
+    } else {
+      N.f <- tibble(id=which(N.t>0)) %>%
+        mutate(N.rpr=((N[id]-N.recruit[id]) * 
+                        as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
+               N.fruit=(N.rpr * 
+                          as.matrix(lc.df[id,3:8]) %*% fec) %>% ceiling) %>% 
+        filter(N.fruit > 0)
+    }
+  
     return(N.f)
   }
 
