@@ -29,10 +29,11 @@ source("code/ca_fn.R")
   lc.r <- 6  # num rows in landscape
   lc.c <- 6  # num columns in landscape
   n.lc <- 6  # num land cover categories
-  N.pop.t0 <- 5  # num cells with buckthorn at t=1
+  N.p.t0 <- 5  # num cells with buckthorn at t=1
   
   # demography
   K <- sample(20:50, n.lc)  # carrying capacity for adults in each lc
+  pr.f <- rbeta(n.lc, 2, 2)  # pr(fruit) in each lc
   fec <- rnorm(n.lc, 100, 10)  # mean(fruit per adult) in each lc
   pr.est <- rbeta(n.lc, 2, 20)  # pr(seedling establishment) in each lc
   
@@ -51,12 +52,14 @@ source("code/ca_fn.R")
   # land cover
   ncell <- lc.r*lc.c
   lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r), 
-                 lc=sample(1:6, ncell, replace=TRUE))
+                 (runif(ncell*n.lc) %>% 
+                    matrix(ncell, dimnames=list(NULL, paste0("LC_", 1:n.lc))) %>%
+                    divide_by(rowSums(.))))
   
   # populations
   N.init <- rep(0, ncell)
-  pop.0 <- sample(1:ncell, N.pop.t0)
-  N.init[pop.0] <- (K[lc.df[pop.0,"lc"]]/2) %>% ceiling
+  p.0 <- sample(1:ncell, N.p.t0)
+  N.init[pop.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (K/2)) %>% ceiling
   
   # dispersal probabilities
   sdd.pr <- sdd_set_probs(lc.df, sdd.max, sdd.rate, bird.pref)
