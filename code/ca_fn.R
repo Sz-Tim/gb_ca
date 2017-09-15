@@ -48,14 +48,47 @@ run_sim <- function(
 ##---
 ## short distance dispersal probabilities
 ##---
-sdd_set_probs <- function(lc.mx, sdd.max, sdd.rate) {
-  # Assign base dispersal probabilities from each cell
-  # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
-  # k=1 contains pr(SDD | center,i,j)
-  # k=2 contains the ID for each cell in the neighborhood
-  # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
-  return(sdd.probs)
-}
+  sdd_set_probs <- function(lc.df, sdd.max, sdd.rate, bird.pref) {
+    # Assign base dispersal probabilities from each cell
+    # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
+    # k=1 contains pr(SDD | center,i,j)
+    # k=2 contains the ID for each cell in the neighborhood
+    # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
+    
+    n.x <- max(lc.df[,1])
+    n.y <- max(lc.df[,2])
+    nbr <- 2 * sdd.max + 1
+    sdd.i <- array(0, dim=c(nbr, nbr, 2, n.x*n.y))
+    
+    # generate default dispersal probability matrix
+    d.pr <- matrix(0, nbr, nbr)
+    ctr <- sdd.max + 1  # center index (i=j) for square mx
+    for(i in 1:nbr) {
+      for(j in i:nbr) {
+        d.pr[i,j] <- dexp((i-ctr)^2 + (j-ctr)^2 - 0.5, sdd.rate)
+        d.pr[j,i] <- d.pr[i,j]
+      }
+    }
+    d.pr <- d.pr/sum(d.pr)
+    
+    # pair cell IDs for each neighborhood
+    xx <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max)) %>% t
+    yy <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max)) %>% t
+    for(n in 1:(n.x*n.y)) {
+      for(i in xx[n,][xx[n,]>0 & xx[n,]<=n.x]) {
+        for(j in yy[n,][yy[n,]>0 & yy[n,]<=n.y]) {
+          sdd.i[xx[n,]==i, yy[n,]==j, 2, n] <- which(lc.df[,1]==i &
+                                                       lc.df[,2]==j)
+        }
+      }
+      # weight by bird habitat preference
+      ib <- sdd.i[,,2,n] != 0  # inbound neighbors
+      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.pref[lc.df[sdd.i[,,2,n][ib], 3]]
+      sdd.i[,,1,n] <- sdd.i[,,1,n]/sum(sdd.i[,,1,n])
+    }
+    
+    return(sdd.i)
+  }
 
 
 ##---
