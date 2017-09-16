@@ -190,7 +190,9 @@
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects
     
-    
+    N.recruit <- rep(0, nrow(lc.df))
+    N.recruit[N.seed$id] <- (N.seed$N * 
+      as.matrix(lc.df[N.seed$id,3:8]) %*% pr.est) %>% ceiling
     return(N.recruit)
   }
 
