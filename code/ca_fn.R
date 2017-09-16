@@ -20,7 +20,7 @@
     
     # 1. Initialize populations
     ncell <- nrow(lc.df)
-    N <- matrix(0, ncell, tmax)
+    N <- matrix(0, ncell, tmax+1)
     N[,1] <- N.init
     N.recruit <- rep(0, ncell)
     
@@ -35,11 +35,14 @@
       N.seed <- ldd_disperse(lc.df, N.seed, n.ldd)
       
       # 5. Seedling establishment
-      N.recruit <- new_seedlings(lc.df, N.seed, pr.est)
+      N.recruit <- new_seedlings(lc.df, N.seed, pr.est, stoch)
       
       # 6. Carrying capacity enforcement on adults
-      N[,t] <- pmin(N[,t], K)
+      N[,t] <- pmin(N[,t], ceiling(as.matrix(lc.df[,3:8]) %*% K))
       N[,t+1] <- N[,t] + N.recruit
+      
+      # progress
+      cat("Finished year", t, "\n")
     }
     return(N)
   }
@@ -74,7 +77,7 @@
     
     # pair cell IDs for each neighborhood
     xx <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max)) %>% t
-    yy <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max)) %>% t
+    yy <- apply(lc.df, 1, function(x) seq(x[2]-sdd.max, x[2]+sdd.max)) %>% t
     for(n in 1:(n.x*n.y)) {
       for(i in xx[n,][xx[n,]>0 & xx[n,]<=n.x]) {
         for(j in yy[n,][yy[n,]>0 & yy[n,]<=n.y]) {
@@ -96,7 +99,7 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(lc.df, N.t, N.recruit, fec, pr.f, stoch=FALSE) {
+  make_fruits <- function(lc.df, N.t, N.recruit, fec, pr.f, stoch=F) {
     # Calculate (N.fruit | N, fec, K) for each cell
     # Fecundity rates & fruiting probabilities are habitat specific
     # Assumes no fruit production in first year
@@ -114,7 +117,7 @@
         filter(N.fruit > 0)
     } else {
       N.f <- tibble(id = which(N.t>0)) %>%
-        mutate(N.rpr = ((N[id]-N.recruit[id]) * 
+        mutate(N.rpr = ((N.t[id]-N.recruit[id]) * 
                           as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
                N.fruit = (N.rpr * 
                             as.matrix(lc.df[id,3:8]) %*% fec) %>% ceiling) %>% 
@@ -128,7 +131,7 @@
 ##---
 ## short distance dispersal
 ##---
-  sdd_disperse <- function(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch=FALSE) {
+  sdd_disperse <- function(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch=F) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
@@ -186,13 +189,17 @@
 ##--
 ## seed germination & establishment
 ##--
-  new_seedlings <- function(lc.df, N.seed, pr.est) {
+  new_seedlings <- function(lc.df, N.seed, pr.est, stoch=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects
     
-    N.recruit <- rep(0, nrow(lc.df))
-    N.recruit[N.seed$id] <- (N.seed$N * 
-      as.matrix(lc.df[N.seed$id,3:8]) %*% pr.est) %>% ceiling
+    if(stoch) {
+      
+    } else {
+      N.recruit <- rep(0, nrow(lc.df))
+      N.recruit[N.seed$id] <- (N.seed$N * 
+                      as.matrix(lc.df[N.seed$id,3:8]) %*% pr.est) %>% ceiling
+    }
     return(N.recruit)
   }
 
