@@ -12,7 +12,7 @@ The land cover within each cell is compositional rather than the more common har
 
 ```{r setup, include=FALSE}
 if(!require(sevcheck)) devtools::install_github("Sz-Tim/sevcheck")
-p_load("tidyverse", "doParallel", "magrittr")
+p_load("tidyverse", "doParallel", "magrittr", "stringr")
 theme_set(theme_bw()); registerDoParallel(makeCluster(2))
 source("code/ca_fn.R")
 ```
@@ -24,26 +24,26 @@ source("code/ca_fn.R")
 ##---
 
   # simulation
-  tmax <- 10  # num time steps per simulation
+  tmax <- 15  # num time steps per simulation
   n.sim <- 1  # num simulations
   stoch <- FALSE  # include stochasticity in demographic processes?
   
   # landscape
-  lc.r <- 30  # num rows in landscape
-  lc.c <- 30  # num columns in landscape
+  lc.r <- 108  # num rows in landscape
+  lc.c <- 81  # num columns in landscape
   n.lc <- 6  # num land cover categories
-  N.p.t0 <- 5  # num cells with buckthorn at t=1
+  N.p.t0 <- 3  # num cells with buckthorn at t=1
   
   # demography
-  K <- sample(20:500, n.lc)  # carrying capacity for adults in each lc
-  pr.f <- rbeta(n.lc, 2, 2)  # pr(fruit) in each lc
-  fec <- rnorm(n.lc, 100, 10)  # mean(fruit per adult) in each lc
-  pr.est <- rbeta(n.lc, 2, 20)  # pr(seedling establishment) in each lc
+  K <- c(1000, 10, 200, 600, 300, 300)  # carrying capacity for adults in each lc
+  pr.f <- c(0.9, 0.1, 0.2, 0.4, 0.2, 0.3)  # pr(fruit) in each lc
+  fec <- c(300, 20, 40, 50, 40, 30)  # mean(fruit per adult) in each lc
+  pr.est <- c(0.2, 0.05, 0.05, 0.02, 0.05, 0.1)  # pr(seedling establish) in each lc
   
   # dispersal
-  sdd.max <- 5  # maximum dispersal distance (in cells)
+  sdd.max <- 3  # maximum dispersal distance (in cells)
   sdd.rate <- 3.5  # 1/mn for dispersal kernel
-  bird.pref <- runif(n.lc) %>% divide_by(sum(.))  # bird habitat relative prefs
+  bird.pref <- c(1,0.2,0.5,0.8,0.8,0.5) %>% divide_by(sum(.))  # bird habitat prefs
   pr.eat <- rbeta(n.lc, 1.5, 2)  # prop fruits eaten by birds
   n.ldd <- 1  # num long distance dispersal events per year
   
@@ -54,12 +54,33 @@ source("code/ca_fn.R")
   
   # land cover
   ncell <- lc.r*lc.c
-  # lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r), 
-  #                (runif(ncell*n.lc) %>% 
-  #                   matrix(ncell, dimnames=list(NULL, paste0("LC_", 1:n.lc))) %>%
-  #                   divide_by(rowSums(.))))
-  lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r),
-                 read_csv("data/t_y_mx.csv")[1:ncell,])
+  blockSize <- 5; maxGridCol <- lc.c; maxGridRow <- lc.r
+  
+  cb.i <- read_csv(paste0("data/roads_01_1a.csv")) %>% 
+    mutate(CellRow=1:n_distinct(top) %>% rep(n_distinct(left)),
+           CellCol=1:n_distinct(left) %>% rep(each=n_distinct(top))) %>%
+    filter((CellRow <= max((CellRow %/% blockSize) * blockSize)) &
+             (CellCol <= max((CellCol %/% blockSize) * blockSize))) %>%
+    mutate(BlockRow=((CellRow-1)%/%blockSize)+1, 
+           BlockCol=((CellCol-1)%/%blockSize)+1,
+           BlockID=paste(str_pad(BlockCol, 7, "left", "0"), 
+                         str_pad(BlockRow, 7, "left", "0"), sep=".") %>% 
+             as.numeric %>% factor %>% as.numeric) %>%
+    select(c(CellID, CellRow, CellCol, BlockID, BlockRow, BlockCol, left, top))
+  
+  Block.inc <- cb.i$BlockID[cb.i$BlockCol <= maxGridCol &
+                            cb.i$BlockRow <= maxGridRow] %>% unique
+  
+  grnt <- read_csv(paste0("data/out_01_1a_grnt.csv")) %>% 
+    mutate(CellID=1:nrow(.)) %>% add_blocks(cb.i=cb.i) %>% 
+    summarise(Dev=sum(V1)/n(), Oth=sum(V2)/n(), Hwd=sum(V3)/n(), 
+              WP=sum(V4)/n(), Evg=sum(V5)/n(), Mxd=sum(V6)/n()) %>%
+    filter(BlockID %in% Block.inc) 
+  
+  lc.df <- tibble(x=cb.i$BlockCol[match(grnt$BlockID, cb.i$BlockID)],
+                  y=cb.i$BlockRow[match(grnt$BlockID, cb.i$BlockID)],
+                  Dev=grnt$Dev, Oth=grnt$Oth, Hwd=grnt$Hwd,
+                  WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
   
   # populations
   N.init <- rep(0, ncell)
@@ -80,11 +101,16 @@ for(s in 1:n.sim) {
 
 
 ```{r plots}
-N.out <- as.tibble(out) %>%
-  mutate(block.col=lc.df$x, block.row=lc.df$y,
-         LC_1=lc.df[,3], LC_2=lc.df[,4], LC_3=lc.df[,5],
-         LC_4=lc.df[,6], LC_5=lc.df[,7], LC_6=lc.df[,8])
-ggplot(N.out, aes(x=block.col, y=block.row, fill=LC_4)) + geom_tile()
+colnames(out) <- paste0("t_", 1:ncol(out))
+N.out <- cbind(lc.df, out) %>% as.tibble
+
+for(t in 1:tmax) {
+  p.t <- ggplot(N.out, aes(x=x, y=y)) + 
+    geom_tile(aes_string(fill=paste0("t_", t))) + 
+    scale_fill_gradient(low="white", high="red", 
+                        limits=range(out[,-ncol(out)]))
+  print(p.t)
+}
 ```
 
 
