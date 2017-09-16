@@ -22,23 +22,24 @@
     ncell <- nrow(lc.df)
     N <- matrix(0, ncell, tmax)
     N[,1] <- N.init
+    N.recruit <- rep(0, ncell)
     
-    for(t in 2:tmax) {
+    for(t in 1:tmax) {
       # 2. Local fruit production
-      N.f <- make_fruits(lc.df, N[,t], N.recruit[,t-1], fec, pr.f, stoch=stoch)
+      N.f <- make_fruits(lc.df, N[,t], N.recruit, fec, pr.f, stoch=stoch)
       
       # 3. Short distance dispersal
-      N.seed <- sdd_disperse(lc.df, N.f, sdd.probs, bird.pref, pr.eat)
+      N.seed <- sdd_disperse(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch)
       
       # 4. Long distance dispersal
       N.seed <- ldd_disperse(lc.df, N[,t], N.seed, n.ldd)
       
       # 5. Seedling establishment
-      N.recruit[,t] <- new_seedlings(lc.df, N.seed, pr.est)
+      N.recruit <- new_seedlings(lc.df, N.seed, pr.est)
       
       # 6. Carrying capacity enforcement on adults
       N[,t] <- pmin(N[,t], K)
-      N[,t+1] <- N[,t] + N.recruit[,t]
+      N[,t+1] <- N[,t] + N.recruit
     }
     return(N)
   }
@@ -87,7 +88,6 @@
         (as.matrix(lc.df[sdd.i[,,2,n][ib], 3:8]) %*% bird.pref)
       sdd.i[,,1,n] <- sdd.i[,,1,n]/sum(sdd.i[,,1,n])
     }
-    
     return(sdd.i)
   }
 
@@ -106,18 +106,18 @@
     #   nrow = sum(N.frt != 0)
     
     if(stoch) {
-      N.f <- tibble(id=which(N.t>0)) %>%
-        mutate(N.rpr=rbinom(n(), N[id]-N.recruit[id],
+      N.f <- tibble(id = which(N.t>0)) %>%
+        mutate(N.rpr = rbinom(n(), N[id]-N.recruit[id],
                             prob=as.matrix(lc.df[id,3:8]) %*% pr.f),
-               N.fruit=rpois(n(), 
+               N.fruit = rpois(n(), 
                              lambda=as.matrix(lc.df[id,3:8]) %*% fec)) %>% 
         filter(N.fruit > 0)
     } else {
-      N.f <- tibble(id=which(N.t>0)) %>%
-        mutate(N.rpr=((N[id]-N.recruit[id]) * 
-                        as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
-               N.fruit=(N.rpr * 
-                          as.matrix(lc.df[id,3:8]) %*% fec) %>% ceiling) %>% 
+      N.f <- tibble(id = which(N.t>0)) %>%
+        mutate(N.rpr = ((N[id]-N.recruit[id]) * 
+                          as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
+               N.fruit = (N.rpr * 
+                            as.matrix(lc.df[id,3:8]) %*% fec) %>% ceiling) %>% 
         filter(N.fruit > 0)
     }
     return(N.f)
@@ -128,16 +128,37 @@
 ##---
 ## short distance dispersal
 ##---
-  sdd_disperse <- function(lc.df, N.f, sdd.probs, pr.eat) {
+  sdd_disperse <- function(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch=FALSE) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
+    # N.emig excludes seeds deposited within the source cell (1-pexp(0.5, rate))
     # Returns sparse matrix N.sdd with:
     #   cols(cell.ID, (N.seed = 2*(N.fruit - N.eaten + N.deposited)))
     #   nrow = sum(N.seed != 0)
     
-    
-    
+    if(stoch) {
+      
+    } else {
+      # calculate seeds deposited within source cell vs emigrants
+      N.seed <- N.f %>%
+        mutate(N.produced = 2*N.fruit,
+               N.emig = (N.produced * pexp(.5,sdd.rate) *
+                          as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
+               N.drop = N.produced - N.emig)
+      # assign emigrants to target cells
+      N.immig <- tibble(id=integer(), N.dep=integer())
+      for(i in 1:sum(N.seed$N.emig > 0)) {
+        n <- N.seed$id[i]
+        N.immig %<>% add_row(id=c(sdd.pr[,,2,n]),
+                             N.dep=c(N.seed$N.emig[i] * sdd.pr[,,1,n]) %>% 
+                               ceiling)
+      }
+      # sum within each target cell
+      N.immig %<>% group_by(id) %>% 
+        summarise(N.seed=sum(N.dep)) %>% 
+        filter(N.seed > 0)
+    }
     return(N.seed)
   }
 
