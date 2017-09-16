@@ -186,9 +186,9 @@
 
 
   
-##--
+##---
 ## seed germination & establishment
-##--
+##---
   new_seedlings <- function(lc.df, N.seed, pr.est, stoch=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects
