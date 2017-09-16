@@ -213,7 +213,18 @@
 ##### MUNGING & PLOTTING FUNCTIONS
 ##########----------------------------------------------------------------------
 
-
+##---
+## add block IDs for aggregating acres
+##---
+add_blocks <- function(x, cb.i=cb.i) {
+  # adds Block IDs to cells for aggregating 1-acre cells to larger blocks
+  # cb.i is a reference dataframe identifying which cells belong to which blocks
+  require(magrittr)
+  x %>%
+    mutate(BlockID=cb.i$BlockID[match(.$CellID, cb.i$CellID)]) %>%
+    filter(!is.na(BlockID)) %>% 
+    group_by(BlockID)
+}
 
 
 
