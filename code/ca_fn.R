@@ -32,7 +32,7 @@
       N.seed <- sdd_disperse(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch)
       
       # 4. Long distance dispersal
-      N.seed <- ldd_disperse(lc.df, N[,t], N.seed, n.ldd)
+      N.seed <- ldd_disperse(lc.df, N.seed, n.ldd)
       
       # 5. Seedling establishment
       N.recruit <- new_seedlings(lc.df, N.seed, pr.est)
@@ -146,6 +146,7 @@
                N.emig = (N.produced * pexp(.5,sdd.rate) *
                           as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
                N.drop = N.produced - N.emig)
+      
       # assign emigrants to target cells
       N.immig <- tibble(id=integer(), N.dep=integer())
       for(i in 1:sum(N.seed$N.emig > 0)) {
@@ -154,6 +155,7 @@
                              N.dep=c(N.seed$N.emig[i] * sdd.pr[,,1,n]) %>% 
                                ceiling)
       }
+      
       # sum within each target cell
       N.immig %<>% group_by(id) %>% 
         summarise(N.seed=sum(N.dep)) %>% 
@@ -167,9 +169,14 @@
 ##---
 ## long distance dispersal
 ##---
-  ldd_disperse <- function(lc.df, N, N.seed, n.ldd) {
+  ldd_disperse <- function(lc.df, N.seed, n.ldd) {
     # Assign n.ldd random LDD events 
     # A single seed is added to n.ldd target cells
+    
+    ldd.id <- sample(1:nrow(lc.df), n.ldd, replace=TRUE)
+    N.immig %<>% add_row(id=ldd.id, N.seed=rep(1, n.ldd)) %>%
+      group_by(id) %>% summarise(N.seed=sum(N.seed))
+    
     return(N.seed)
   }
 
