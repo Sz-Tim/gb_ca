@@ -159,8 +159,8 @@
       # sum within each target cell
       N.seed %<>% add_row(id=N.source$id, N.dep=c(N.source$N.drop)) %>%
         group_by(id) %>% 
-        summarise(N.seed=sum(N.dep)) %>% 
-        filter(N.seed > 0)
+        summarise(N=sum(N.dep)) %>% 
+        filter(N > 0)
     }
     return(N.seed)
   }
@@ -175,8 +175,8 @@
     # A single seed is added to n.ldd target cells
     
     ldd.id <- sample(1:nrow(lc.df), n.ldd, replace=TRUE)
-    N.seed %<>% add_row(id=ldd.id, N.seed=rep(1, n.ldd)) %>%
-      group_by(id) %>% summarise(N.seed=sum(N.seed))
+    N.seed %<>% add_row(id=ldd.id, N=rep(1, n.ldd)) %>%
+      group_by(id) %>% summarise(N=sum(N))
     
     return(N.seed)
   }
