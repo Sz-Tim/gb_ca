@@ -25,22 +25,23 @@ source("code/ca_fn.R")
 
   # simulation
   tmax <- 10  # num time steps per simulation
-  n.sim <- 5  # num simulations
+  n.sim <- 1  # num simulations
+  stoch <- FALSE  # include stochasticity in demographic processes?
   
   # landscape
-  lc.r <- 6  # num rows in landscape
-  lc.c <- 6  # num columns in landscape
+  lc.r <- 30  # num rows in landscape
+  lc.c <- 30  # num columns in landscape
   n.lc <- 6  # num land cover categories
   N.p.t0 <- 5  # num cells with buckthorn at t=1
   
   # demography
-  K <- sample(20:50, n.lc)  # carrying capacity for adults in each lc
+  K <- sample(20:500, n.lc)  # carrying capacity for adults in each lc
   pr.f <- rbeta(n.lc, 2, 2)  # pr(fruit) in each lc
   fec <- rnorm(n.lc, 100, 10)  # mean(fruit per adult) in each lc
   pr.est <- rbeta(n.lc, 2, 20)  # pr(seedling establishment) in each lc
   
   # dispersal
-  sdd.max <- 2  # maximum dispersal distance (in cells)
+  sdd.max <- 5  # maximum dispersal distance (in cells)
   sdd.rate <- 3.5  # 1/mn for dispersal kernel
   bird.pref <- runif(n.lc) %>% divide_by(sum(.))  # bird habitat relative prefs
   pr.eat <- rbeta(n.lc, 1.5, 2)  # prop fruits eaten by birds
@@ -53,10 +54,12 @@ source("code/ca_fn.R")
   
   # land cover
   ncell <- lc.r*lc.c
-  lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r), 
-                 (runif(ncell*n.lc) %>% 
-                    matrix(ncell, dimnames=list(NULL, paste0("LC_", 1:n.lc))) %>%
-                    divide_by(rowSums(.))))
+  # lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r), 
+  #                (runif(ncell*n.lc) %>% 
+  #                   matrix(ncell, dimnames=list(NULL, paste0("LC_", 1:n.lc))) %>%
+  #                   divide_by(rowSums(.))))
+  lc.df <- cbind(expand.grid(x=1:lc.c, y=1:lc.r),
+                 read_csv("data/t_y_mx.csv")[1:ncell,])
   
   # populations
   N.init <- rep(0, ncell)
@@ -70,7 +73,20 @@ source("code/ca_fn.R")
 ```{r runSim}
 
 for(s in 1:n.sim) {
-  
+  out <- run_sim(lc.df, N.init, K, fec, pr.f, pr.eat, sdd.pr, sdd.rate, 
+                      n.ldd, pr.est, tmax, stoch=FALSE)
 }
 ```
+
+
+```{r plots}
+N.out <- as.tibble(out) %>%
+  mutate(block.col=lc.df$x, block.row=lc.df$y,
+         LC_1=lc.df[,3], LC_2=lc.df[,4], LC_3=lc.df[,5],
+         LC_4=lc.df[,6], LC_5=lc.df[,7], LC_6=lc.df[,8])
+ggplot(N.out, aes(x=block.col, y=block.row, fill=LC_4)) + geom_tile()
+```
+
+
+
 
