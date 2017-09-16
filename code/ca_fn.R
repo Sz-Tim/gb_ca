@@ -141,23 +141,24 @@
       
     } else {
       # calculate seeds deposited within source cell vs emigrants
-      N.seed <- N.f %>%
+      N.source <- N.f %>%
         mutate(N.produced = 2*N.fruit,
                N.emig = (N.produced * pexp(.5,sdd.rate) *
                           as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
                N.drop = N.produced - N.emig)
       
       # assign emigrants to target cells
-      N.immig <- tibble(id=integer(), N.dep=integer())
-      for(i in 1:sum(N.seed$N.emig > 0)) {
-        n <- N.seed$id[i]
-        N.immig %<>% add_row(id=c(sdd.pr[,,2,n]),
-                             N.dep=c(N.seed$N.emig[i] * sdd.pr[,,1,n]) %>% 
+      N.seed <- tibble(id=integer(), N.dep=integer())
+      for(i in 1:sum(N.source$N.emig > 0)) {
+        n <- N.source$id[i]
+        N.seed %<>% add_row(id=c(sdd.pr[,,2,n]),
+                             N.dep=c(N.source$N.emig[i] * sdd.pr[,,1,n]) %>% 
                                ceiling)
       }
       
       # sum within each target cell
-      N.immig %<>% group_by(id) %>% 
+      N.seed %<>% add_row(id=N.source$id, N.dep=c(N.source$N.drop)) %>%
+        group_by(id) %>% 
         summarise(N.seed=sum(N.dep)) %>% 
         filter(N.seed > 0)
     }
@@ -174,7 +175,7 @@
     # A single seed is added to n.ldd target cells
     
     ldd.id <- sample(1:nrow(lc.df), n.ldd, replace=TRUE)
-    N.immig %<>% add_row(id=ldd.id, N.seed=rep(1, n.ldd)) %>%
+    N.seed %<>% add_row(id=ldd.id, N.seed=rep(1, n.ldd)) %>%
       group_by(id) %>% summarise(N.seed=sum(N.seed))
     
     return(N.seed)
@@ -188,6 +189,8 @@
   new_seedlings <- function(lc.df, N.seed, pr.est) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects
+    
+    
     return(N.recruit)
   }
 
