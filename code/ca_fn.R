@@ -175,7 +175,7 @@
       # calculate seeds deposited within source cell vs emigrants
       N.source <- N.f %>%
         mutate(N.produced = 2*N.fruit,
-               N.emig = (N.produced * pexp(.5,sdd.rate) *
+               N.emig = (N.produced * (1-pexp(.5,sdd.rate)) *
                           as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
                N.drop = N.produced - N.emig)
       
