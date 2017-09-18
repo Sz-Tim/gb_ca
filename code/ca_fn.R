@@ -14,35 +14,56 @@
 ## simulation wrapper
 ##---
   run_sim <- function(lc.df, N.init, K, fec, pr.f, pr.eat, sdd.pr, sdd.rate, 
-                      n.ldd, pr.est, tmax, stoch=FALSE) {
+                      n.ldd, pr.est, tmax, stoch=FALSE, simple=TRUE) {
     # Runs the simulation, calling subsequent submodules
+    # simple=T runs model with no fruits/seeds/seedlings -- lambda only
     require(tidyverse); require(magrittr)
     
     # 1. Initialize populations
     ncell <- nrow(lc.df)
     N <- matrix(0, ncell, tmax+1)
     N[,1] <- N.init
-    N.recruit <- rep(0, ncell)
     
-    for(t in 1:tmax) {
-      # 2. Local fruit production
-      N.f <- make_fruits(lc.df, N[,t], N.recruit, fec, pr.f, stoch=stoch)
-      
-      # 3. Short distance dispersal
-      N.seed <- sdd_disperse(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch)
-      
-      # 4. Long distance dispersal
-      N.seed <- ldd_disperse(lc.df, N.seed, n.ldd)
-      
-      # 5. Seedling establishment
-      N.recruit <- new_seedlings(lc.df, N.seed, pr.est, stoch)
-      
-      # 6. Carrying capacity enforcement on adults
-      N[,t] <- pmin(N[,t], ceiling(as.matrix(lc.df[,3:8]) %*% K))
-      N[,t+1] <- N[,t] + N.recruit
-      
-      # progress
-      cat("Finished year", t, "\n")
+    if(simple) {
+      for(t in 1:tmax){
+        # 2. Local growth
+        N.new <- grow_pops(lc.df, N[,t], lambda, stoch)
+        
+        # 3. Short distance dispersal
+        N.emig <- sdd_simple(lc.df, N[,t], N.new, sdd.pr, sdd.rate, stoch)
+        
+        # 4. Long distance dispersal
+        N.emig <- ldd_disperse(lc.df, N.emig, n.ldd, simple=TRUE)
+        
+        # 5. Update population sizes
+        N[,t+1] <- N.emig$N
+        
+        # progress
+        cat("Finished year", t, "\n")
+      }
+    } else {
+      for(t in 1:tmax) {
+        N.recruit <- rep(0, ncell)
+        
+        # 2. Local fruit production
+        N.f <- make_fruits(lc.df, N[,t], N.recruit, fec, pr.f, stoch)
+        
+        # 3. Short distance dispersal
+        N.seed <- sdd_fs(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch)
+        
+        # 4. Long distance dispersal
+        N.seed <- ldd_disperse(lc.df, N.seed, n.ldd, simple=FALSE)
+        
+        # 5. Seedling establishment
+        N.recruit <- new_seedlings(lc.df, N.seed, pr.est, stoch)
+        
+        # 6. Carrying capacity enforcement on adults
+        N[,t] <- pmin(N[,t], ceiling(as.matrix(lc.df[,3:8]) %*% K))
+        N[,t+1] <- N[,t] + N.recruit
+        
+        # progress
+        cat("Finished year", t, "\n")
+      }
     }
     return(N)
   }
