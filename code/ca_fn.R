@@ -105,9 +105,9 @@
 
   
 ##---
-## local population growth (simple a la Merow 2011)
+## local population growth: simple (a la Merow 2011)
 ##---
-  grow_pops <- function(lc.df, N.t, lambda, stoch) {
+  grow_pops <- function(lc.df, N.t, lambda, stoch=F) {
     # Calculate updated population sizes after local reproduction 
     # Growth rates are habitat specific
     # Returns sparse dataframe N.new with:
@@ -122,11 +122,11 @@
       lam.id <- as.matrix(lc.df[N.id, 3:8]) %*% lambda
       N.new <- tibble(id = which(N.t>0)) %>%
         mutate(N.pop=N.t[id],
-               N.new=N.pop * (lam.id-1),
+               N.new=(N.pop * (lam.id-1)) %>% ceiling,
                N.pop.upd=pmin(K.id,
                               N.pop + 
                                 (lam.id>=1)*N.new*pexp(0.5, sdd.rate) +
-                                (lam.id<1)*N.new))
+                                (lam.id<1)*N.new) %>% ceiling)
     }
     return(N.new)
   }
