@@ -52,9 +52,12 @@
 ##---
 ## short distance dispersal probabilities
 ##---
-  sdd_set_probs <- function(lc.df, sdd.max, sdd.rate, bird.pref) {
+  sdd_set_probs <- function(lc.df, sdd.max, sdd.rate, bird.pref, trunc.diag=T) {
     # Assign base dispersal probabilities from each cell
     # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
+    # trunc.diag: if TRUE, the sdd neighborhood is restricted to within sdd.max
+    #   including along diagonals; if FALSE, then sdd.max refers to the maximum
+    #   allowable horizontal & vertical distance from the source cell
     # k=1 contains pr(SDD | center,i,j)
     # k=2 contains the ID for each cell in the neighborhood
     # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
@@ -70,6 +73,11 @@
     for(i in 1:nbr) {
       for(j in i:nbr) {
         d.pr[i,j] <- dexp((i-ctr)^2 + (j-ctr)^2 - 0.5, sdd.rate)
+        if(trunc.diag) {
+          if( sqrt((i-ctr)^2 + (j-ctr)^2) > sdd.max ) {
+            d.pr[i,j] <- 0
+          }
+        }
         d.pr[j,i] <- d.pr[i,j]
       }
     }
