@@ -241,15 +241,19 @@
 ##---
 ## long distance dispersal
 ##---
-  ldd_disperse <- function(lc.df, N.seed, n.ldd) {
+  ldd_disperse <- function(lc.df, N.df, n.ldd, simple=TRUE) {
     # Assign n.ldd random LDD events 
     # A single seed is added to n.ldd target cells
     
     ldd.id <- sample(1:nrow(lc.df), n.ldd, replace=TRUE)
-    N.seed %<>% add_row(id=ldd.id, N=rep(1, n.ldd)) %>%
-      group_by(id) %>% summarise(N=sum(N))
+    if(simple) {
+      N.df$N[N.df$id==ldd.id] <- N.df$N[N.df$id==ldd.id] + 1
+    } else {
+      N.df %<>% add_row(id=ldd.id, N=rep(1, n.ldd)) %>%
+        group_by(id) %>% summarise(N=sum(N))
+    }
     
-    return(N.seed)
+    return(N.df)
   }
 
 
