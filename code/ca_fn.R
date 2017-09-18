@@ -134,6 +134,37 @@
   
   
 ##---
+## short distance dispersal: simple
+##---
+  sdd_simple <- function(lc.df, N.t, N.new, sdd.pr, sdd.rate, stoch=F) {
+    # Calculate (N.arrivals | N.new, sdd.probs)
+    # Accounts for distance from source cell & bird habitat preference
+    # Returns dataframe with total population sizes.
+    
+    # assign emigrants to target cells
+    N.emig <- tibble(id=integer(), N=integer())
+    N.source <- N.new %>% filter(N.new > 0)
+    for(i in 1:nrow(N.source)) {
+      n <- N.source$id[i]
+      N.emig %<>% add_row(id=c(sdd.pr[,,2,n]),
+                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]) %>% 
+                            ceiling)
+    }
+    
+    # sum within each target cell
+    N.emig %<>% add_row(id=1:length(N.t), N=N.t) %>%
+      group_by(id) %>% filter(id != 0) %>%
+      summarise(N=sum(N))
+    # restrict to K
+    K.id <- as.matrix(lc.df[N.emig$id, 3:8]) %*% K
+    N.emig %<>% 
+      mutate(N=pmin(K.id, N))
+    return(N.emig)
+  }
+  
+  
+  
+##---
 ## local fruit production
 ##---
   make_fruits <- function(lc.df, N.t, N.recruit, fec, pr.f, stoch=F) {
