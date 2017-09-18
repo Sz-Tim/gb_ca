@@ -111,6 +111,18 @@ for(t in 1:tmax) {
                         limits=range(out[,-ncol(out)]))
   print(p.t)
 }
+ggplot(N.out, aes(x=Dev)) + 
+  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+ggplot(N.out, aes(x=Oth)) + 
+  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+ggplot(N.out, aes(x=Hwd)) + 
+  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+ggplot(N.out, aes(x=WP)) + 
+  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+ggplot(N.out, aes(x=Evg)) + 
+  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+ggplot(N.out, aes(x=Mxd)) + 
+  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
 ```
 
 
