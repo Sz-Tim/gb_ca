@@ -197,9 +197,9 @@
 
   
 ##---
-## short distance dispersal
+## short distance dispersal: fruits & seeds
 ##---
-  sdd_disperse <- function(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch=F) {
+  sdd_fs <- function(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch=F) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
