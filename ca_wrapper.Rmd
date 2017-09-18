@@ -24,26 +24,28 @@ source("code/ca_fn.R")
 ##---
 
   # simulation
-  tmax <- 15  # num time steps per simulation
+  tmax <- 20  # num time steps per simulation
   n.sim <- 1  # num simulations
   stoch <- FALSE  # include stochasticity in demographic processes?
   
   # landscape
-  lc.r <- 108  # num rows in landscape
-  lc.c <- 81  # num columns in landscape
+  lc.r <- 40#81  # num rows in landscape
+  lc.c <- 50#108  # num columns in landscape
   n.lc <- 6  # num land cover categories
   N.p.t0 <- 3  # num cells with buckthorn at t=1
   
   # demography
-  K <- c(1000, 10, 200, 600, 300, 300)  # carrying capacity for adults in each lc
-  pr.f <- c(0.9, 0.1, 0.2, 0.4, 0.2, 0.3)  # pr(fruit) in each lc
-  fec <- c(300, 20, 40, 50, 40, 30)  # mean(fruit per adult) in each lc
-  pr.est <- c(0.2, 0.05, 0.05, 0.02, 0.05, 0.1)  # pr(seedling establish) in each lc
+  K <- c(1000, 10, 200, 600, 300, 300)  # carrying capacity for adults
+  pr.f <- c(0.9, 0.1, 0.2, 0.4, 0.2, 0.3)  # pr(fruit)
+  fec <- c(300, 20, 40, 50, 40, 30)  # mean(fruit per adult)
+  pr.est <- c(0.2, 0.05, 0.05, 0.02, 0.05, 0.1)  # pr(seedling estab)
+  lambda <- c(2, 0.1, 0.8, 1.6, 1.1, 1.3)  # pop growth rate
   
   # dispersal
   sdd.max <- 3  # maximum dispersal distance (in cells)
+  trunc.diag <- TRUE  # restrict dispersal to sdd.max in any direction
   sdd.rate <- 3.5  # 1/mn for dispersal kernel
-  bird.pref <- c(1,0.2,0.5,0.8,0.8,0.5) %>% divide_by(sum(.))  # bird habitat prefs
+  bird.pref <- c(0.2,0.2,0.5,2,0.8,0.5) %>% divide_by(sum(.))  # bird hab prefs
   pr.eat <- rbeta(n.lc, 1.5, 2)  # prop fruits eaten by birds
   n.ldd <- 1  # num long distance dispersal events per year
   
@@ -95,7 +97,7 @@ source("code/ca_fn.R")
 
 for(s in 1:n.sim) {
   out <- run_sim(lc.df, N.init, K, fec, pr.f, pr.eat, sdd.pr, sdd.rate, 
-                      n.ldd, pr.est, tmax, stoch=FALSE)
+                      n.ldd, pr.est, tmax, stoch=FALSE, simple=TRUE)
 }
 ```
 
