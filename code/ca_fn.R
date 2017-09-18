@@ -97,6 +97,35 @@
 
   
 ##---
+## local population growth (simple a la Merow 2011)
+##---
+  grow_pops <- function(lc.df, N.t, lambda, stoch) {
+    # Calculate updated population sizes after local reproduction 
+    # Growth rates are habitat specific
+    # Returns sparse dataframe N.new with:
+    #   col(id, N.pop, N.new=pop.delta, N.pop.upd=N.pop+N.new.nonemigrants)
+    #   nrow = sum(N.new != 0)
+    
+    if(stoch) {
+      
+    } else {
+      N.id <- which(N.t>0)
+      K.id <- as.matrix(lc.df[N.id, 3:8]) %*% K
+      lam.id <- as.matrix(lc.df[N.id, 3:8]) %*% lambda
+      N.new <- tibble(id = which(N.t>0)) %>%
+        mutate(N.pop=N.t[id],
+               N.new=N.pop * (lam.id-1),
+               N.pop.upd=pmin(K.id,
+                              N.pop + 
+                                (lam.id>=1)*N.new*pexp(0.5, sdd.rate) +
+                                (lam.id<1)*N.new))
+    }
+    return(N.new)
+  }
+  
+  
+  
+##---
 ## local fruit production
 ##---
   make_fruits <- function(lc.df, N.t, N.recruit, fec, pr.f, stoch=F) {
