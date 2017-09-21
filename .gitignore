@@ -5,8 +5,8 @@
 # Session Data files
 .RData
 
-# Output from knitr
-*.html
+# To do list
+CA_todo.md
 
 # Example code in package build process
 *-Ex.R
