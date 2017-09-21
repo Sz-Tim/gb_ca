@@ -23,46 +23,66 @@
     ncell <- nrow(lc.df)
     N <- matrix(0, ncell, tmax+1)
     N[,1] <- N.init
+    N.recruit <- rep(0, ncell)
     
     if(simple) {
       for(t in 1:tmax){
-        # 2. Local growth
-        N.new <- grow_pops(lc.df, N[,t], lambda, stoch)
+        # 2. Pre-multiply compositional parameters
+        K.agg <- as.matrix(lc.df[,3:8]) %*% K
+        lambda.agg <- as.matrix(lc.df[,3:8]) %*% lambda
         
-        # 3. Short distance dispersal
-        N.emig <- sdd_simple(lc.df, N[,t], N.new, sdd.pr, sdd.rate, stoch)
+        # 3. Local growth
+        cat("Growing pops...\n")
+        N.new <- grow_pops(N[,t], lambda.agg, K.agg, stoch)
         
-        # 4. Long distance dispersal
-        N.emig <- ldd_disperse(lc.df, N.emig, n.ldd, simple=TRUE)
+        # 4. Short distance dispersal
+        cat("Dispersing seeds locally...\n")
+        N.emig <- sdd_simple(N[,t], N.new, sdd.pr, sdd.rate, K.agg, stoch)
         
-        # 5. Update population sizes
+        # 5. Long distance dispersal
+        cat("Dispersing seeds regionally...\n")
+        N.emig <- ldd_disperse(ncell, N.emig, n.ldd, simple=TRUE)
+        
+        # 6. Update population sizes
+        cat("Updating population sizes...\n")
         N[,t+1] <- N.emig$N
         
         # progress
-        cat("Finished year", t, "\n")
+        cat("Finished year", t, "\n\n")
       }
     } else {
       for(t in 1:tmax) {
-        N.recruit <- rep(0, ncell)
+        # 2. Pre-multiply compositional parameters
+        lc.mx <- as.matrix(lc.df[,3:8])
+        K.agg <- lc.mx %*% K
+        fec.agg <- lc.mx %*% fec
+        pr.f.agg <- lc.mx %*% pr.f
+        pr.eat.agg <- lc.mx %*% pr.eat
+        pr.est.agg <- lc.mx %*% pr.est
         
-        # 2. Local fruit production
-        N.f <- make_fruits(lc.df, N[,t], N.recruit, fec, pr.f, stoch)
+        # 3. Local fruit production
+        cat("Producing fruit...\n")
+        N.f <- make_fruits(N[,t], N.recruit, fec.agg, pr.f.agg, stoch)
         
-        # 3. Short distance dispersal
-        N.seed <- sdd_fs(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch)
+        # 4. Short distance dispersal
+        cat("Dispersing seeds locally...\n")
+        N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, stoch)
         
-        # 4. Long distance dispersal
-        N.seed <- ldd_disperse(lc.df, N.seed, n.ldd, simple=FALSE)
+        # 5. Long distance dispersal
+        cat("Dispersing seeds regionally...\n")
+        N.seed <- ldd_disperse(ncell, N.seed, n.ldd, simple=FALSE)
         
-        # 5. Seedling establishment
-        N.recruit <- new_seedlings(lc.df, N.seed, pr.est, stoch)
+        # 6. Seedling establishment
+        cat("Establishing seedlings...\n")
+        N.recruit <- new_seedlings(ncell, N.seed, pr.est.agg, stoch)
         
-        # 6. Carrying capacity enforcement on adults
+        # 7. Carrying capacity enforcement on adults
+        cat("Evaluating carrying capacity...\n")
         N[,t] <- pmin(N[,t], ceiling(as.matrix(lc.df[,3:8]) %*% K))
         N[,t+1] <- N[,t] + N.recruit
         
         # progress
-        cat("Finished year", t, "\n")
+        cat("Finished year", t, "\n\n")
       }
     }
     return(N)
