@@ -32,23 +32,20 @@
         lambda.agg <- as.matrix(lc.df[,3:8]) %*% lambda
         
         # 3. Local growth
-        cat("Growing pops...\n")
+        cat("Year", t, "- Growing...")
         N.new <- grow_pops(N[,t], lambda.agg, K.agg, stoch)
         
         # 4. Short distance dispersal
-        cat("Dispersing seeds locally...\n")
+        cat("Dispersing locally...")
         N.emig <- sdd_simple(N[,t], N.new, sdd.pr, sdd.rate, K.agg, stoch)
         
         # 5. Long distance dispersal
-        cat("Dispersing seeds regionally...\n")
+        cat("Dispersing regionally...")
         N.emig <- ldd_disperse(ncell, N.emig, n.ldd, simple=TRUE)
         
         # 6. Update population sizes
-        cat("Updating population sizes...\n")
+        cat("Updating abundances.\n")
         N[,t+1] <- N.emig$N
-        
-        # progress
-        cat("Finished year", t, "\n\n")
       }
     } else {
       for(t in 1:tmax) {
@@ -61,28 +58,25 @@
         pr.est.agg <- lc.mx %*% pr.est
         
         # 3. Local fruit production
-        cat("Producing fruit...\n")
+        cat("Year", t, "- Fruiting...")
         N.f <- make_fruits(N[,t], N.recruit, fec.agg, pr.f.agg, stoch)
         
         # 4. Short distance dispersal
-        cat("Dispersing seeds locally...\n")
+        cat("Dispersing locally...")
         N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, stoch)
         
         # 5. Long distance dispersal
-        cat("Dispersing seeds regionally...\n")
+        cat("Dispersing regionally...")
         N.seed <- ldd_disperse(ncell, N.seed, n.ldd, simple=FALSE)
         
         # 6. Seedling establishment
-        cat("Establishing seedlings...\n")
+        cat("Establishing...")
         N.recruit <- new_seedlings(ncell, N.seed, pr.est.agg, stoch)
         
         # 7. Carrying capacity enforcement on adults
-        cat("Evaluating carrying capacity...\n")
+        cat("Hitting capacity.\n")
         N[,t] <- pmin(N[,t], ceiling(as.matrix(lc.df[,3:8]) %*% K))
         N[,t+1] <- N[,t] + N.recruit
-        
-        # progress
-        cat("Finished year", t, "\n\n")
       }
     }
     return(N)
