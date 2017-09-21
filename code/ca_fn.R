@@ -123,18 +123,25 @@
     xx <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max))
     yy <- apply(lc.df, 1, function(x) seq(x[2]-sdd.max, x[2]+sdd.max))
     for(n in 1:(n.x*n.y)) {
+      
+      # vectorize for speed
       n_i <- expand.grid(xx[,n][xx[,n]>0 & xx[,n]<=n.x],
                          yy[,n][yy[,n]>0 & yy[,n]<=n.y])
       n_x <- apply(n_i, 1, function(x) which(xx[,n]==x[1]))
       n_y <- apply(n_i, 1, function(x) which(yy[,n]==x[2]))
-      lc_i <- apply(n_i, 1, function(x) which(lc.df[,1]==x[1] & lc.df[,2]==x[2]))
+      c_i <- apply(n_i, 1, function(x) which(lc.df[,1]==x[1] & lc.df[,2]==x[2]))
+      
+      # find cell ID for each cell in neighborhood
       for(i in 1:nrow(n_i)) {
-        sdd.i[n_x[i],n_y[i],2,n] <- lc_i[i]
+        sdd.i[n_x[i],n_y[i],2,n] <- c_i[i]
       }
       
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
       sdd.i[,,1,n][ib] <- d.pr[ib] * bird.pref.agg[sdd.i[,,2,n][ib]]
+      
+      # set cell ID to 0 if pr(target) == 0 
+      sdd.i[,,2,n][sdd.i[,,1,n]==0] <- 0
       if(n %% 100 == 0) {
         cat("finished cell", n, "\n")
       }
