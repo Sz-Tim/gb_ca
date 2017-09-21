@@ -2,7 +2,7 @@
 #   - compositional habitats
 #   - higher resolution (even @100 acre blocks)
 #   - more nuanced dispersal: pr(drop) vs pr(bird)
-#   - universal K or habitat specific?
+#   - habitat specific K
 #   - separate life history more -- fruit production step
 #     - requires explicit mortality instead of lambdas < 1
 
