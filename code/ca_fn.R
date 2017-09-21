@@ -258,8 +258,7 @@
       # calculate seeds deposited within source cell vs emigrants
       N.source <- N.f %>%
         mutate(N.produced = 2*N.fruit,
-               N.emig = (N.produced * (1-pexp(.5,sdd.rate)) *
-                          as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
+               N.emig = N.produced * (1-pexp(.5,sdd.rate)) * pr.eat.agg[id,],
                N.drop = N.produced - N.emig)
       
       # assign emigrants to target cells
@@ -267,8 +266,7 @@
       for(i in 1:sum(N.source$N.emig > 0)) {
         n <- N.source$id[i]
         N.seed %<>% add_row(id=c(sdd.pr[,,2,n]),
-                             N.dep=c(N.source$N.emig[i] * sdd.pr[,,1,n]) %>% 
-                               ceiling)
+                             N.dep=c(N.source$N.emig[i] * sdd.pr[,,1,n]))
       }
       
       # sum within each target cell
@@ -285,11 +283,11 @@
 ##---
 ## long distance dispersal
 ##---
-  ldd_disperse <- function(lc.df, N.df, n.ldd, simple=TRUE) {
+  ldd_disperse <- function(ncell, N.df, n.ldd, simple=TRUE) {
     # Assign n.ldd random LDD events 
     # A single seed is added to n.ldd target cells
     
-    ldd.id <- sample(1:nrow(lc.df), n.ldd, replace=TRUE)
+    ldd.id <- sample(1:ncell, n.ldd, replace=TRUE)
     if(simple) {
       N.df$N[N.df$id==ldd.id] <- N.df$N[N.df$id==ldd.id] + 1
     } else {
@@ -305,16 +303,15 @@
 ##---
 ## seed germination & establishment
 ##---
-  new_seedlings <- function(lc.df, N.seed, pr.est, stoch=F) {
+  new_seedlings <- function(ncell, N.seed, pr.est.agg, stoch=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects
     
     if(stoch) {
       
     } else {
-      N.recruit <- rep(0, nrow(lc.df))
-      N.recruit[N.seed$id] <- (N.seed$N * 
-                      as.matrix(lc.df[N.seed$id,3:8]) %*% pr.est) %>% ceiling
+      N.recruit <- rep(0, ncell)
+      N.recruit[N.seed$id] <- N.seed$N * pr.est.agg[N.seed$id,]
     }
     return(N.recruit)
   }
