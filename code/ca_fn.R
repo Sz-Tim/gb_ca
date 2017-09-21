@@ -107,6 +107,7 @@
     n.y <- max(lc.df[,2])
     nbr <- 2 * sdd.max + 1
     sdd.i <- array(0, dim=c(nbr, nbr, 2, n.x*n.y))
+    bird.pref.agg <- as.matrix(lc.df[,3:8]) %*% bird.pref
     
     # generate default dispersal probability matrix
     d.pr <- matrix(0, nbr, nbr)
@@ -125,30 +126,37 @@
     d.pr <- d.pr/sum(d.pr)
     
     # pair cell IDs for each neighborhood
-    xx <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max)) %>% t
-    yy <- apply(lc.df, 1, function(x) seq(x[2]-sdd.max, x[2]+sdd.max)) %>% t
+    xx <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max))
+    yy <- apply(lc.df, 1, function(x) seq(x[2]-sdd.max, x[2]+sdd.max))
     for(n in 1:(n.x*n.y)) {
-      for(i in xx[n,][xx[n,]>0 & xx[n,]<=n.x]) {
-        for(j in yy[n,][yy[n,]>0 & yy[n,]<=n.y]) {
-          sdd.i[xx[n,]==i, yy[n,]==j, 2, n] <- which(lc.df[,1]==i &
-                                                       lc.df[,2]==j)
-        }
+      n_i <- expand.grid(xx[,n][xx[,n]>0 & xx[,n]<=n.x],
+                         yy[,n][yy[,n]>0 & yy[,n]<=n.y])
+      n_x <- apply(n_i, 1, function(x) which(xx[,n]==x[1]))
+      n_y <- apply(n_i, 1, function(x) which(yy[,n]==x[2]))
+      lc_i <- apply(n_i, 1, function(x) which(lc.df[,1]==x[1] & lc.df[,2]==x[2]))
+      for(i in 1:nrow(n_i)) {
+        sdd.i[n_x[i],n_y[i],2,n] <- lc_i[i]
       }
+      
       # weight by bird habitat preference
-      ib <- sdd.i[,,2,n] != 0  # inbound neighbors
-      sdd.i[,,1,n][ib] <- d.pr[ib] * 
-        (as.matrix(lc.df[sdd.i[,,2,n][ib], 3:8]) %*% bird.pref)
-      sdd.i[,,1,n] <- sdd.i[,,1,n]/sum(sdd.i[,,1,n])
+      ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
+      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.pref.agg[sdd.i[,,2,n][ib]]
+      if(n %% 100 == 0) {
+        cat("finished cell", n, "\n")
+      }
     }
+    cat("finished cell", n)
+    sdd.i[,,1,] <- apply(sdd.i[,,1,], 3, function(x) x/sum(x))
     return(sdd.i)
   }
 
-
+  
+  
   
 ##---
 ## local population growth: simple (a la Merow 2011)
 ##---
-  grow_pops <- function(lc.df, N.t, lambda, stoch=F) {
+  grow_pops <- function(N.t, lambda.agg, K.agg, stoch=F) {
     # Calculate updated population sizes after local reproduction 
     # Growth rates are habitat specific
     # Returns sparse dataframe N.new with:
@@ -159,15 +167,14 @@
       
     } else {
       N.id <- which(N.t>0)
-      K.id <- as.matrix(lc.df[N.id, 3:8]) %*% K
-      lam.id <- as.matrix(lc.df[N.id, 3:8]) %*% lambda
+      lam.id <- lambda.agg[N.id]
       N.new <- tibble(id = which(N.t>0)) %>%
         mutate(N.pop=N.t[id],
-               N.new=(N.pop * (lam.id-1)) %>% ceiling,
-               N.pop.upd=pmin(K.id,
+               N.new=(N.pop * (lam.id-1)),
+               N.pop.upd=pmin(K.agg[N.id,],
                               N.pop + 
                                 (lam.id>=1)*N.new*pexp(0.5, sdd.rate) +
-                                (lam.id<1)*N.new) %>% ceiling)
+                                (lam.id<1)*N.new))
     }
     return(N.new)
   }
@@ -177,19 +184,18 @@
 ##---
 ## short distance dispersal: simple
 ##---
-  sdd_simple <- function(lc.df, N.t, N.new, sdd.pr, sdd.rate, stoch=F) {
+  sdd_simple <- function(N.t, N.new, sdd.pr, sdd.rate, K.agg, stoch=F) {
     # Calculate (N.arrivals | N.new, sdd.probs)
     # Accounts for distance from source cell & bird habitat preference
     # Returns dataframe with total population sizes.
     
     # assign emigrants to target cells
-    N.emig <- tibble(id=integer(), N=integer())
     N.source <- N.new %>% filter(N.new > 0)
+    N.emig <- tibble(id=integer(), N=integer())
     for(i in 1:nrow(N.source)) {
       n <- N.source$id[i]
       N.emig %<>% add_row(id=c(sdd.pr[,,2,n]),
-                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]) %>% 
-                            ceiling)
+                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]))
     }
     
     # sum within each target cell
@@ -197,9 +203,8 @@
       group_by(id) %>% filter(id != 0) %>%
       summarise(N=sum(N))
     # restrict to K
-    K.id <- as.matrix(lc.df[N.emig$id, 3:8]) %*% K
     N.emig %<>% 
-      mutate(N=pmin(K.id, N))
+      mutate(N=pmin(K.agg[N.emig$id,], N))
     return(N.emig)
   }
   
@@ -208,7 +213,7 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(lc.df, N.t, N.recruit, fec, pr.f, stoch=F) {
+  make_fruits <- function(N.t, N.recruit, fec.agg, pr.f.agg, stoch=F) {
     # Calculate (N.fruit | N, fec, K) for each cell
     # Fecundity rates & fruiting probabilities are habitat specific
     # Assumes no fruit production in first year
@@ -218,18 +223,16 @@
     #   nrow = sum(N.frt != 0)
     
     if(stoch) {
-      N.f <- tibble(id = which(N.t>0)) %>%
+      N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
         mutate(N.rpr = rbinom(n(), N[id]-N.recruit[id],
                             prob=as.matrix(lc.df[id,3:8]) %*% pr.f),
                N.fruit = rpois(n(), 
                              lambda=as.matrix(lc.df[id,3:8]) %*% fec)) %>% 
         filter(N.fruit > 0)
     } else {
-      N.f <- tibble(id = which(N.t>0)) %>%
-        mutate(N.rpr = ((N.t[id]-N.recruit[id]) * 
-                          as.matrix(lc.df[id,3:8]) %*% pr.f) %>% ceiling,
-               N.fruit = (N.rpr * 
-                            as.matrix(lc.df[id,3:8]) %*% fec) %>% ceiling) %>% 
+      N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
+        mutate(N.rpr=((N.t[id]-N.recruit[id]) * pr.f.agg[id,]),
+               N.fruit=(N.rpr * fec.agg[id,])) %>% 
         filter(N.fruit > 0)
     }
     return(N.f)
@@ -240,7 +243,7 @@
 ##---
 ## short distance dispersal: fruits & seeds
 ##---
-  sdd_fs <- function(lc.df, N.f, pr.eat, sdd.pr, sdd.rate, stoch=F) {
+  sdd_fs <- function(N.f, pr.eat.agg, sdd.pr, sdd.rate, stoch=F) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
