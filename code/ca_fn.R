@@ -196,7 +196,7 @@
     for(i in 1:nrow(N.source)) {
       n <- N.source$id[i]
       N.emig %<>% add_row(id=c(sdd.pr[,,2,n]),
-                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]) %>% round)
+                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]))
     }
     
     # sum within each target cell
@@ -232,7 +232,7 @@
         filter(N.fruit > 0)
     } else {
       N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-        mutate(N.rpr=((N.t[id]-N.recruit[id]) * pr.f.agg[id,]) %>% round,
+        mutate(N.rpr=(N.t[id]-N.recruit[id]) * pr.f.agg[id,],
                N.fruit=(N.rpr * fec.agg[id,]) %>% round) %>% 
         filter(N.fruit > 0)
     }
@@ -259,8 +259,7 @@
       # calculate seeds deposited within source cell vs emigrants
       N.source <- N.f %>%
         mutate(N.produced = (2.3*N.fruit) %>% round,
-               N.emig=(N.produced * (1-pexp(.5,sdd.rate)) * pr.eat.agg[id,]) %>%
-                 round,
+               N.emig=N.produced * (1-pexp(.5,sdd.rate)) * pr.eat.agg[id,],
                N.drop=N.produced - N.emig)
       
       # assign emigrants to target cells
