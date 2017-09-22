@@ -75,7 +75,7 @@
         
         # 7. Carrying capacity enforcement on adults
         cat("Hitting capacity.\n")
-        N[,t] <- pmin(N[,t], ceiling(as.matrix(lc.df[,3:8]) %*% K))
+        N[,t] <- pmin(N[,t], round(as.matrix(lc.df[,3:8]) %*% K))
         N[,t+1] <- N[,t] + N.recruit
       }
     }
@@ -175,7 +175,7 @@
                N.pop.upd=pmin(K.agg[N.id,],
                               N.pop + 
                                 (lam.id>=1)*N.new*pexp(0.5, sdd.rate) +
-                                (lam.id<1)*N.new))
+                                (lam.id<1)*N.new) %>% round)
     }
     return(N.new)
   }
@@ -196,7 +196,7 @@
     for(i in 1:nrow(N.source)) {
       n <- N.source$id[i]
       N.emig %<>% add_row(id=c(sdd.pr[,,2,n]),
-                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]))
+                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]) %>% round)
     }
     
     # sum within each target cell
@@ -205,7 +205,7 @@
       summarise(N=sum(N))
     # restrict to K
     N.emig %<>% 
-      mutate(N=pmin(K.agg[N.emig$id,], N))
+      mutate(N=pmin(K.agg[N.emig$id,], N) %>% round)
     return(N.emig)
   }
   
@@ -232,8 +232,8 @@
         filter(N.fruit > 0)
     } else {
       N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-        mutate(N.rpr=((N.t[id]-N.recruit[id]) * pr.f.agg[id,]),
-               N.fruit=(N.rpr * fec.agg[id,])) %>% 
+        mutate(N.rpr=((N.t[id]-N.recruit[id]) * pr.f.agg[id,]) %>% round,
+               N.fruit=(N.rpr * fec.agg[id,]) %>% round) %>% 
         filter(N.fruit > 0)
     }
     return(N.f)
@@ -258,9 +258,10 @@
     } else {
       # calculate seeds deposited within source cell vs emigrants
       N.source <- N.f %>%
-        mutate(N.produced = 2*N.fruit,
-               N.emig = N.produced * (1-pexp(.5,sdd.rate)) * pr.eat.agg[id,],
-               N.drop = N.produced - N.emig)
+        mutate(N.produced = (2.3*N.fruit) %>% round,
+               N.emig=(N.produced * (1-pexp(.5,sdd.rate)) * pr.eat.agg[id,]) %>%
+                 round,
+               N.drop=N.produced - N.emig)
       
       # assign emigrants to target cells
       N.seed <- tibble(id=integer(), N.dep=integer())
@@ -273,7 +274,7 @@
       # sum within each target cell
       N.seed %<>% add_row(id=N.source$id, N.dep=c(N.source$N.drop)) %>%
         group_by(id) %>% 
-        summarise(N=sum(N.dep)) %>% 
+        summarise(N=sum(N.dep) %>% round) %>% 
         filter(N > 0)
     }
     return(N.seed)
@@ -312,7 +313,7 @@
       
     } else {
       N.recruit <- rep(0, ncell)
-      N.recruit[N.seed$id] <- N.seed$N * pr.est.agg[N.seed$id,]
+      N.recruit[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,]) %>% round
     }
     return(N.recruit)
   }
