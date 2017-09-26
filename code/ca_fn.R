@@ -71,7 +71,10 @@
         
         # 6. Seedling establishment
         cat("Establishing...")
-        N.recruit <- new_seedlings(ncell, N.seed, pr.est.agg, stoch)
+        estab.out <- new_seedlings(ncell, N.seed, N.sb, pr.est.agg, pr.sb.agg,
+                                   stoch, bank)
+        N.recruit <- estab.out$N.rcrt
+        N.sb <- estab.out$N.sb
         
         # 7. Carrying capacity enforcement on adults
         cat("Hitting capacity.\n")
