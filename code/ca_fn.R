@@ -13,17 +13,36 @@
 ##---
 ## simulation wrapper
 ##---
-  run_sim <- function(lc.df, N.init, K, fec, pr.f, pr.eat, sdd.pr, sdd.rate, 
-                      n.ldd, pr.est, tmax, stoch=FALSE, simple=TRUE) {
+  run_sim <- function(g.p, lc.df, sdd.pr, N.init, control.p=NULL) {
     # Runs the simulation, calling subsequent submodules
     # simple=T runs model with no fruits/seeds/seedlings -- lambda only
     require(tidyverse); require(magrittr)
     
+    # Unpack parameters
+    tmax <- g.p$tmax
+    stoch <- g.p$stoch
+    simple <- g.p$simple
+    bank <- g.p$bank
+    ncell <- g.p$lc.r * g.p$lc.c
+    K <- g.p$K  # carrying capacity
+    pr.f <- g.p$pr.f  # pr(fruit)
+    fec <- g.p$fec  # mean(fruit per adult)
+    pr.est <- g.p$pr.est  # pr(seedling est)
+    pr.sb <- g.p$pr.sb  # pr(ann.surv seed bank)
+    lambda <- g.p$lambda  # pop growth rate
+    sdd.rate <- g.p$sdd.rate  # 1/mn for dispersal kernel
+    pr.eat <- g.p$pr.eat  # pr(birds eat frt)
+    n.ldd <- g.p$n.ldd   # num long distance dispersal events per year
+    
+    # If buckthorn is being actively managed...
+    if(!is.null(control.p)) {}
+    
+    
     # 1. Initialize populations
-    ncell <- nrow(lc.df)
     N <- matrix(0, ncell, tmax+1)
     N[,1] <- N.init
     N.recruit <- rep(0, ncell)
+    N.sb <- rep(0, ncell)
     
     if(simple) {
       for(t in 1:tmax){
@@ -56,6 +75,7 @@
         pr.f.agg <- lc.mx %*% pr.f
         pr.eat.agg <- lc.mx %*% pr.eat
         pr.est.agg <- lc.mx %*% pr.est
+        pr.sb.agg <- lc.mx %*% pr.sb
         
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
@@ -90,7 +110,7 @@
 ##---
 ## short distance dispersal probabilities
 ##---
-  sdd_set_probs <- function(lc.df, sdd.max, sdd.rate, bird.pref, trunc.diag=T) {
+  sdd_set_probs <- function(lc.df, g.p) {
     # Assign base dispersal probabilities from each cell
     # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
     # trunc.diag: if TRUE, the sdd neighborhood is restricted to within sdd.max
@@ -100,11 +120,17 @@
     # k=2 contains the ID for each cell in the neighborhood
     # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
     
+    # unpack parameters
+    sdd.max <- g.p$sdd.max
+    sdd.rate <- g.p$sdd.rate
+    bird.hab <- g.p$bird.hab
+    trunc.diag <- g.p$trunc.diag
+    
     n.x <- max(lc.df[,1])
     n.y <- max(lc.df[,2])
     nbr <- 2 * sdd.max + 1
     sdd.i <- array(0, dim=c(nbr, nbr, 2, n.x*n.y))
-    bird.pref.agg <- as.matrix(lc.df[,3:8]) %*% bird.pref
+    bird.hab.agg <- as.matrix(lc.df[,3:8]) %*% (bird.hab %>% divide_by(sum(.)))
     
     # generate default dispersal probability matrix
     d.pr <- matrix(0, nbr, nbr)
@@ -141,7 +167,7 @@
       
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
-      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.pref.agg[sdd.i[,,2,n][ib]]
+      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.hab.agg[sdd.i[,,2,n][ib]]
       
       # set cell ID to 0 if pr(target) == 0 
       sdd.i[,,2,n][sdd.i[,,1,n]==0] <- 0
@@ -229,9 +255,9 @@
     if(stoch) {
       N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
         mutate(N.rpr = rbinom(n(), N[id]-N.recruit[id],
-                            prob=as.matrix(lc.df[id,3:8]) %*% pr.f),
+                              prob=pr.f.agg[id]),
                N.fruit = rpois(n(), 
-                             lambda=as.matrix(lc.df[id,3:8]) %*% fec)) %>% 
+                             lambda=fec.agg[id])) %>% 
         filter(N.fruit > 0)
     } else {
       N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
