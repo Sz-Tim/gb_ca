@@ -307,17 +307,25 @@
 ##---
 ## seed germination & establishment
 ##---
-  new_seedlings <- function(ncell, N.seed, pr.est.agg, stoch=F) {
+  new_seedlings <- function(ncell, N.seed, N.sb, pr.est.agg, pr.sb.agg,
+                            stoch=F, bank=F) {
     # Calculate (N.new | N.seed, pr.est)
-    # Allows for incorporation of management effects
+    # Allows for incorporation of management effects & seedbank
     
     if(stoch) {
       
     } else {
-      N.recruit <- rep(0, ncell)
-      N.recruit[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,]) %>% round
+      N.rcrt <- rep(0, ncell)
+      N.rcrt[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,] +
+                              N.sb[N.seed$id] * pr.est.agg[N.seed$id,]) %>% round
+      if(bank) {
+        N.sb[N.seed$id] <- ((N.seed$N - N.rcrt[N.seed$id]) * 
+                              pr.sb.agg[N.seed$id]) %>% round
+      } else {
+        N.sb <- rep(0, ncell)
+      }
     }
-    return(N.recruit)
+    return(list(N.rcrt=N.rcrt, N.sb=N.sb))
   }
 
 
