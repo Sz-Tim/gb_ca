@@ -152,7 +152,7 @@
     }
     d.pr <- d.pr/sum(d.pr)
     
-    # pair cell IDs for each neighborhood
+    # pair cell IDs for each neighborhood; indexes match neighborhood matrix
     xx <- map(lc.df$x, ~seq(.-sdd.max, .+sdd.max))
     yy <- map(lc.df$y, ~seq(.-sdd.max, .+sdd.max))
 
