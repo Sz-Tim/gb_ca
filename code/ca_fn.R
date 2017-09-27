@@ -53,7 +53,7 @@
         
         # 3. Local growth
         cat("Year", t, "- Growing...")
-        N.new <- grow_pops(N[,t], lambda.agg, K.agg, stoch)
+        N.new <- grow_pops(N[,t], lambda.agg, K.agg, sdd.rate, stoch)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
