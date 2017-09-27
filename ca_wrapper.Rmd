@@ -2,7 +2,7 @@
 title: "Glossy Buckthorn CA"
 author: "Tim Szewczyk"
 date: "9/15/2017"
-output: html_document
+output: github_document
 ---
 
 # readme  
@@ -25,18 +25,19 @@ source("code/ca_fn.R")
 
   set.seed(25)
   n.sim <- 1
-  blockSize <- 5  # number of acres per block (width & height)
+  blockSize <- 2  # number of acres per block (width & height)
   g.p <- list(
     # general
     tmax=25,  # num time steps per simulation
     stoch=FALSE,  # include stochasticity in demography/SDD?
     simple=FALSE,  # simple lambda growth vs. fruits/seeds
+    n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=81,  # num rows in landscape
-    lc.c=108,  # num columns in landscape
+    lc.r=204,  # num rows in landscape
+    lc.c=271,  # num columns in landscape
     n.lc=6,  # num land cover categories
-    N.p.t0=100,  # num cells with buckthorn at t=1
+    N.p.t0=20,  # num cells with buckthorn at t=1
     
     # demography
     K=c(2000, 20, 400, 1200, 600, 600),  # carrying capacity
@@ -97,7 +98,7 @@ source("code/ca_fn.R")
   N.init[p.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (g.p$K/2)) %>% round
   
   # dispersal probabilities
-  sdd.pr <- sdd_set_probs(lc.df, g.p)
+  sdd.pr <- sdd_set_probs(lc.df, g.p, n_cores=4)
 ```
 
 ```{r runSim}
