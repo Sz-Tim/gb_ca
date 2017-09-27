@@ -112,7 +112,7 @@
 ##---
 ## short distance dispersal probabilities
 ##---
-  sdd_set_probs <- function(lc.df, g.p) {
+  sdd_set_probs <- function(lc.df, g.p, n_cores=1) {
     # Assign base dispersal probabilities from each cell
     # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
     # trunc.diag: if TRUE, the sdd neighborhood is restricted to within sdd.max
@@ -121,7 +121,7 @@
     # k=1 contains pr(SDD | center,i,j)
     # k=2 contains the ID for each cell in the neighborhood
     # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
-    require(purrr); require(tidyverse)
+    require(purrr); require(tidyverse); require(pbapply)
     
     # unpack parameters
     sdd.max <- g.p$sdd.max
@@ -167,9 +167,14 @@
     
     # match xy combinations with cell IDs
     cat("determining neighborhood cell IDs...\n")
-    c_i <- lapply(n_i, function(x) 
-      apply(x, 1, function(xi) 
-        which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
+    if(n_cores > 1) {
+      c_i <- pblapply(n_i, cl=makeCluster(n_cores), FUN=function(x) 
+        apply(x, 1, function(xi) which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
+    } else {
+      c_i <- pblapply(n_i, function(x) 
+        apply(x, 1, function(xi) which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
+    }
+    
     
     cat("calculating probabilities...\n")
     for(n in 1:ncell) {
