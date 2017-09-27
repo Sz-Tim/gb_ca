@@ -98,7 +98,7 @@ source("code/ca_fn.R")
   N.init[p.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (g.p$K/2)) %>% round
   
   # dispersal probabilities
-  sdd.pr <- sdd_set_probs(lc.df, g.p, n_cores=4)
+  sdd.pr <- sdd_set_probs(lc.df, g.p)
 ```
 
 ```{r runSim}
