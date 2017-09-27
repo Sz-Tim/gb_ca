@@ -173,6 +173,8 @@
       
       # set cell ID to 0 if pr(target) == 0 
       sdd.i[,,2,n][sdd.i[,,1,n]==0] <- 0
+      
+      # progress update
       if(n %% 100 == 0) {
         cat("finished cell", n, "\n")
       }
@@ -308,23 +310,20 @@
     } else {
       # calculate seeds deposited within source cell vs emigrants
       N.source <- N.f %>%
-        mutate(N.produced = (2.3*N.fruit) %>% round,
-               N.emig=N.produced * (1-pexp(.5,sdd.rate)) * pr.eat.agg[id,],
-               N.drop=N.produced - N.emig)
+        mutate(N.produced=(2.3*N.fruit),
+               N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.agg[id,],
+               N.drop=N.produced-N.emig)
+      N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
       
-      # assign emigrants to target cells
-      N.seed <- tibble(id=integer(), N.dep=integer())
-      for(i in 1:sum(N.source$N.emig > 0)) {
-        n <- N.source$id[i]
-        N.seed %<>% add_row(id=c(sdd.pr[,,2,n]),
-                             N.dep=c(N.source$N.emig[i] * sdd.pr[,,1,n]))
-      }
-      
-      # sum within each target cell
-      N.seed %<>% add_row(id=N.source$id, N.dep=c(N.source$N.drop)) %>%
+      # assign emigrants to target cells & sum within each cell
+      N.seed %<>% 
+        add_row(id=apply(N.source, 1, 
+                         function(x) c(sdd.pr[,,2,x[1]])) %>% c, 
+                N.dep=apply(N.source, 1, 
+                            function(x) c(x[5] * sdd.pr[,,1,x[1]])) %>% c) %>%
+        filter(N.dep > 0) %>%
         group_by(id) %>% 
-        summarise(N=sum(N.dep) %>% round) %>% 
-        filter(N > 0)
+        summarise(N=sum(N.dep) %>% round)
     }
     return(N.seed)
   }
