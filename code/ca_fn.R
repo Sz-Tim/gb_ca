@@ -121,6 +121,7 @@
     # k=1 contains pr(SDD | center,i,j)
     # k=2 contains the ID for each cell in the neighborhood
     # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
+    require(purrr); require(tidyverse)
     
     # unpack parameters
     sdd.max <- g.p$sdd.max
@@ -130,8 +131,9 @@
     
     n.x <- max(lc.df[,1])
     n.y <- max(lc.df[,2])
+    ncell <- n.x*n.y
     nbr <- 2 * sdd.max + 1
-    sdd.i <- array(0, dim=c(nbr, nbr, 2, n.x*n.y))
+    sdd.i <- array(0, dim=c(nbr, nbr, 2, ncell))
     bird.hab.agg <- as.matrix(lc.df[,3:8]) %*% (bird.hab %>% divide_by(sum(.)))
     
     # generate default dispersal probability matrix
@@ -151,21 +153,28 @@
     d.pr <- d.pr/sum(d.pr)
     
     # pair cell IDs for each neighborhood
-    xx <- apply(lc.df, 1, function(x) seq(x[1]-sdd.max, x[1]+sdd.max))
-    yy <- apply(lc.df, 1, function(x) seq(x[2]-sdd.max, x[2]+sdd.max))
-    for(n in 1:(n.x*n.y)) {
-      
-      # vectorize for speed
-      n_i <- expand.grid(xx[,n][xx[,n]>0 & xx[,n]<=n.x],
-                         yy[,n][yy[,n]>0 & yy[,n]<=n.y])
-      n_x <- apply(n_i, 1, function(x) which(xx[,n]==x[1]))
-      n_y <- apply(n_i, 1, function(x) which(yy[,n]==x[2]))
-      c_i <- apply(n_i, 1, function(x) which(lc.df[,1]==x[1] & lc.df[,2]==x[2]))
-      
+    xx <- map(lc.df$x, ~seq(.-sdd.max, .+sdd.max))
+    yy <- map(lc.df$y, ~seq(.-sdd.max, .+sdd.max))
+
+    # create lists of inbounds xy neighborhood ranges
+    n_ix <- map(xx, ~.[.>0 & .<n.x])
+    n_iy <- map(yy, ~.[.>0 & .<n.y])
+    
+    # generate all xy combinations & neighborhood matrix indices
+    n_i <- map2(n_ix, n_iy, expand.grid)
+    n_x <- map2(xx, n_ix, `%in%`) %>% map(which) %>% map(range)
+    n_y <- map2(yy, n_iy, `%in%`) %>% map(which) %>% map(range)
+    
+    # match xy combinations with cell IDs
+    cat("determining neighborhood cell IDs...\n")
+    c_i <- lapply(n_i, function(x) 
+      apply(x, 1, function(xi) 
+        which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
+    
+    cat("calculating probabilities...\n")
+    for(n in 1:ncell) {
       # find cell ID for each cell in neighborhood
-      for(i in 1:nrow(n_i)) {
-        sdd.i[n_x[i],n_y[i],2,n] <- c_i[i]
-      }
+      sdd.i[n_x[[n]][1]:n_x[[n]][2], n_y[[n]][1]:n_y[[n]][2],2,n] <- c_i[[n]]
       
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
@@ -175,11 +184,11 @@
       sdd.i[,,2,n][sdd.i[,,1,n]==0] <- 0
       
       # progress update
-      if(n %% 100 == 0) {
+      if(n %% 1000 == 0) {
         cat("finished cell", n, "\n")
       }
     }
-    cat("finished cell", n)
+    cat("finished:", n, "cells\n")
     sdd.i[,,1,] <- apply(sdd.i[,,1,], 3, function(x) x/sum(x))
     return(sdd.i)
   }
@@ -190,7 +199,7 @@
 ##---
 ## local population growth: simple (a la Merow 2011)
 ##---
-  grow_pops <- function(N.t, lambda.agg, K.agg, stoch=F) {
+  grow_pops <- function(N.t, lambda.agg, K.agg, sdd.rate, stoch=F) {
     # Calculate updated population sizes after local reproduction 
     # Growth rates are habitat specific
     # Returns sparse dataframe N.new with:
