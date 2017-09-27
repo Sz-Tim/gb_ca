@@ -223,22 +223,14 @@
     # Accounts for distance from source cell & bird habitat preference
     # Returns dataframe with total population sizes.
     
-    # assign emigrants to target cells
     N.source <- N.new %>% filter(N.new > 0)
-    N.emig <- tibble(id=integer(), N=integer())
-    for(i in 1:nrow(N.source)) {
-      n <- N.source$id[i]
-      N.emig %<>% add_row(id=c(sdd.pr[,,2,n]),
-                          N=c(N.source$N.new[i] * sdd.pr[,,1,n]))
-    }
-    
-    # sum within each target cell
-    N.emig %<>% add_row(id=1:length(N.t), N=N.t) %>%
-      group_by(id) %>% filter(id != 0) %>%
+    N.emig <- tibble(id=1:length(N.t), N=N.t) %>%
+      add_row(id=apply(N.source, 1, function(x) c(sdd.pr[,,2,x[1]])) %>% c, 
+              N=apply(N.source, 1, function(x) c(x[3] * (1-pexp(.5,sdd.rate)) * 
+                                      sdd.pr[,,1,x[1]])) %>% c) %>%
+      filter(id != 0) %>% group_by(id) %>%
       summarise(N=sum(N))
-    # restrict to K
-    N.emig %<>% 
-      mutate(N=pmin(K.agg[N.emig$id,], N) %>% round)
+    N.emig %<>% mutate(N=pmin(K.agg[N.emig$id,], N) %>% round)
     return(N.emig)
   }
   
