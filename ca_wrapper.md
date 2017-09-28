@@ -36,8 +36,8 @@ The land cover within each cell is compositional rather than the more common har
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=104,  # num rows in landscape
-    lc.c=171,  # num columns in landscape
+    lc.r=204,  # num rows in landscape
+    lc.c=271,  # num columns in landscape
     n.lc=6,  # num land cover categories
     N.p.t0=20,  # num cells with buckthorn at t=1
     
@@ -109,16 +109,16 @@ The land cover within each cell is compositional rather than the more common har
     ## finished cell 1000
 
     ## Warning in for (n in 1:ncell) {: closing unused connection 8 (<-localhost:
-    ## 11079)
+    ## 11570)
 
     ## Warning in for (n in 1:ncell) {: closing unused connection 7 (<-localhost:
-    ## 11079)
+    ## 11570)
 
     ## Warning in for (n in 1:ncell) {: closing unused connection 6 (<-localhost:
-    ## 11079)
+    ## 11570)
 
     ## Warning in for (n in 1:ncell) {: closing unused connection 5 (<-localhost:
-    ## 11079)
+    ## 11570)
 
     ## finished cell 2000 
     ## finished cell 3000 
@@ -136,7 +136,45 @@ The land cover within each cell is compositional rather than the more common har
     ## finished cell 15000 
     ## finished cell 16000 
     ## finished cell 17000 
-    ## finished: 17784 cells
+    ## finished cell 18000 
+    ## finished cell 19000 
+    ## finished cell 20000 
+    ## finished cell 21000 
+    ## finished cell 22000 
+    ## finished cell 23000 
+    ## finished cell 24000 
+    ## finished cell 25000 
+    ## finished cell 26000 
+    ## finished cell 27000 
+    ## finished cell 28000 
+    ## finished cell 29000 
+    ## finished cell 30000 
+    ## finished cell 31000 
+    ## finished cell 32000 
+    ## finished cell 33000 
+    ## finished cell 34000 
+    ## finished cell 35000 
+    ## finished cell 36000 
+    ## finished cell 37000 
+    ## finished cell 38000 
+    ## finished cell 39000 
+    ## finished cell 40000 
+    ## finished cell 41000 
+    ## finished cell 42000 
+    ## finished cell 43000 
+    ## finished cell 44000 
+    ## finished cell 45000 
+    ## finished cell 46000 
+    ## finished cell 47000 
+    ## finished cell 48000 
+    ## finished cell 49000 
+    ## finished cell 50000 
+    ## finished cell 51000 
+    ## finished cell 52000 
+    ## finished cell 53000 
+    ## finished cell 54000 
+    ## finished cell 55000 
+    ## finished: 55284 cells
 
 ``` r
 for(s in 1:n.sim) {
