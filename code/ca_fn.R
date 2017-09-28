@@ -161,18 +161,18 @@
     n_iy <- map(yy, ~.[.>0 & .<n.y])
     
     # generate all xy combinations & neighborhood matrix indices
-    n_i <- map2(n_ix, n_iy, expand.grid)
-    n_x <- map2(xx, n_ix, `%in%`) %>% map(which) %>% map(range)
-    n_y <- map2(yy, n_iy, `%in%`) %>% map(which) %>% map(range)
+    cat("generating neighborhoods...\n")
+    n_i <- map2(n_ix, n_iy, expand_v) 
+    n_x <- map2(xx, n_ix, `%fin%`) %>% map(which) %>% map(range)
+    n_y <- map2(yy, n_iy, `%fin%`) %>% map(which) %>% map(range)
     
     # match xy combinations with cell IDs
     cat("determining neighborhood cell IDs...\n")
     if(g.p$n_cores > 1) {
-      c_i <- pblapply(n_i, cl=makeCluster(g.p$n_cores), FUN=function(x) 
-        apply(x, 1, function(xi) which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
+      c_i <- pblapply(n_i, function(x) fmatch(x, lc.df$x_y), 
+                      cl=makeCluster(g.p$n_cores))
     } else {
-      c_i <- pblapply(n_i, function(x) 
-        apply(x, 1, function(xi) which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
+      c_i <- pblapply(n_i, function(x) fmatch(x, lc.df$x_y))
     }
     
     
