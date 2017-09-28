@@ -5,7 +5,6 @@ date: "9/15/2017"
 output: github_document
 ---
 
-# readme  
 This is a wrapper for running the glossy buckthorn cellular automata model. It sets up the environment, allows the assignment of all necessary parameters, runs the simulation, and visualizes the results.
 
 The land cover within each cell is compositional rather than the more common hard classification. As a result, all land cover-specific parameters are computed proportionally to the land cover in a cell (i.e., lc.prop %*% K, where lc.prop is a matrix with columns for land cover and a row for each cell, and K is a vector of carrying capacities with one per land cover type).
@@ -50,7 +49,7 @@ source("code/ca_fn.R")
     lambda=c(2.5, 0.5, 1.6, 1.9, 1.8, 1.3),  # pop growth rate
     
     # dispersal
-    sdd.max=20,  # max dispersal distance (unit: cells)
+    sdd.max=2,  # max dispersal distance (unit: cells)
     sdd.rate=0.05,  # 1/mn for dispersal kernel
     trunc.diag=TRUE,  # restrict dispersal to sdd.max radius
     pr.eat=c(0.6, 0.5, 0.5, 0.25, 0.2, 0.8),  # pr(birds eat frt)
@@ -120,17 +119,17 @@ for(t in 1:g.p$tmax) {
   print(p.t)
 }
 ggplot(N.out, aes(x=Dev)) + 
-  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+  geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ggplot(N.out, aes(x=Oth)) + 
-  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+  geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ggplot(N.out, aes(x=Hwd)) + 
-  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+  geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ggplot(N.out, aes(x=WP)) + 
-  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+  geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ggplot(N.out, aes(x=Evg)) + 
-  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+  geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ggplot(N.out, aes(x=Mxd)) + 
-  geom_point(aes_string(y=paste0("t_", tmax)), alpha=0.1)
+  geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ```
 
 
