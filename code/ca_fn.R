@@ -121,7 +121,7 @@
     # k=1 contains pr(SDD | center,i,j)
     # k=2 contains the ID for each cell in the neighborhood
     # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
-    require(purrr); require(tidyverse); require(pbapply)
+    require(purrr); require(tidyverse); require(pbapply); require(fastmatch)
     
     # unpack parameters
     sdd.max <- g.p$sdd.max
