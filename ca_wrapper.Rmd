@@ -88,13 +88,14 @@ source("code/ca_fn.R")
   
   lc.df <- tibble(x=cb.i$BlockCol[match(grnt$BlockID, cb.i$BlockID)],
                   y=cb.i$BlockRow[match(grnt$BlockID, cb.i$BlockID)],
+                  x_y=paste(x,y,sep="_"),
                   Dev=grnt$Dev, Oth=grnt$Oth, Hwd=grnt$Hwd,
                   WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
   
   # populations
   N.init <- rep(0, ncell)
   p.0 <- sample(1:ncell, g.p$N.p.t0)
-  N.init[p.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (g.p$K/2)) %>% round
+  N.init[p.0] <- (as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/2)) %>% round
   
   # dispersal probabilities
   sdd.pr <- sdd_set_probs(lc.df, g.p)
