@@ -405,6 +405,15 @@ add_blocks <- function(x, cb.i=cb.i) {
 
 
 
+##---
+## expand all pairwise combinations of two vectors into one character vector
+##---
+expand_v <- function(x,y) {
+  paste(rep.int(x, length(y)), 
+        rep.int(y, rep.int(length(x),length(y))),
+        sep="_")
+}
+
 
 
 
