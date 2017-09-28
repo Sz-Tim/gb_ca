@@ -3,9 +3,6 @@ Glossy Buckthorn CA
 Tim Szewczyk
 9/15/2017
 
-readme
-======
-
 This is a wrapper for running the glossy buckthorn cellular automata model. It sets up the environment, allows the assignment of all necessary parameters, runs the simulation, and visualizes the results.
 
 The land cover within each cell is compositional rather than the more common hard classification. As a result, all land cover-specific parameters are computed proportionally to the land cover in a cell (i.e., lc.prop %\*% K, where lc.prop is a matrix with columns for land cover and a row for each cell, and K is a vector of carrying capacities with one per land cover type).
@@ -17,7 +14,20 @@ The land cover within each cell is compositional rather than the more common har
 
   set.seed(25)
   n.sim <- 1
-  blockSize <- 3  # number of acres per block (width & height)
+  blockSize <- 2  # number of acres per block (width & height)
+  cb.i <- make_cb_i(blockSize)
+```
+
+    ## Parsed with column specification:
+    ## cols(
+    ##   left = col_double(),
+    ##   top = col_double(),
+    ##   CellID = col_integer(),
+    ##   roadLen = col_double(),
+    ##   roadCt = col_double()
+    ## )
+
+``` r
   g.p <- list(
     # general
     tmax=25,  # num time steps per simulation
@@ -26,8 +36,8 @@ The land cover within each cell is compositional rather than the more common har
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=13,  # num rows in landscape
-    lc.c=18,  # num columns in landscape
+    lc.r=104,  # num rows in landscape
+    lc.c=171,  # num columns in landscape
     n.lc=6,  # num land cover categories
     N.p.t0=20,  # num cells with buckthorn at t=1
     
@@ -42,8 +52,8 @@ The land cover within each cell is compositional rather than the more common har
     lambda=c(2.5, 0.5, 1.6, 1.9, 1.8, 1.3),  # pop growth rate
     
     # dispersal
-    sdd.max=2,  # max dispersal distance (unit: cells)
-    sdd.rate=0.05,  # 1/mn for dispersal kernel
+    sdd.max=20,  # max dispersal distance (unit: cells)
+    sdd.rate=0.04,  # 1/mn for dispersal kernel
     trunc.diag=TRUE,  # restrict dispersal to sdd.max radius
     pr.eat=c(0.6, 0.5, 0.5, 0.25, 0.2, 0.8),  # pr(birds eat frt)
     bird.hab=c(0.2, 0.2, 0.5, 2, 0.8, 0.5),  # bird habitat prefs
@@ -57,30 +67,6 @@ The land cover within each cell is compositional rather than the more common har
   
   # land cover
   ncell <- g.p$lc.r*g.p$lc.c
-  
-  cb.i <- read_csv(paste0("data/roads_01_1a.csv")) %>% 
-    mutate(CellRow=1:n_distinct(top) %>% rep(n_distinct(left)),
-           CellCol=1:n_distinct(left) %>% rep(each=n_distinct(top))) %>%
-    filter((CellRow <= max((CellRow %/% blockSize) * blockSize)) &
-             (CellCol <= max((CellCol %/% blockSize) * blockSize))) %>%
-    mutate(BlockRow=((CellRow-1)%/%blockSize)+1, 
-           BlockCol=((CellCol-1)%/%blockSize)+1,
-           BlockID=paste(str_pad(BlockCol, 7, "left", "0"), 
-                         str_pad(BlockRow, 7, "left", "0"), sep=".") %>% 
-             as.numeric %>% factor %>% as.numeric) %>%
-    select(c(CellID, CellRow, CellCol, BlockID, BlockRow, BlockCol, left, top))
-```
-
-    ## Parsed with column specification:
-    ## cols(
-    ##   left = col_double(),
-    ##   top = col_double(),
-    ##   CellID = col_integer(),
-    ##   roadLen = col_double(),
-    ##   roadCt = col_double()
-    ## )
-
-``` r
   Block.inc <- cb.i$BlockID[cb.i$BlockCol <= g.p$lc.c &
                             cb.i$BlockRow <= g.p$lc.r] %>% unique
   
@@ -104,23 +90,53 @@ The land cover within each cell is compositional rather than the more common har
 ``` r
   lc.df <- tibble(x=cb.i$BlockCol[match(grnt$BlockID, cb.i$BlockID)],
                   y=cb.i$BlockRow[match(grnt$BlockID, cb.i$BlockID)],
+                  x_y=paste(x,y,sep="_"),
                   Dev=grnt$Dev, Oth=grnt$Oth, Hwd=grnt$Hwd,
                   WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
   
   # populations
   N.init <- rep(0, ncell)
   p.0 <- sample(1:ncell, g.p$N.p.t0)
-  N.init[p.0] <- (as.matrix(lc.df[p.0,3:8]) %*% (g.p$K/2)) %>% round
+  N.init[p.0] <- (as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/2)) %>% round
   
   # dispersal probabilities
   sdd.pr <- sdd_set_probs(lc.df, g.p)
 ```
 
-    ## Loading required package: pbapply
-
+    ## generating neighborhoods...
     ## determining neighborhood cell IDs...
     ## calculating probabilities...
-    ## finished: 234 cells
+    ## finished cell 1000
+
+    ## Warning in for (n in 1:ncell) {: closing unused connection 8 (<-localhost:
+    ## 11079)
+
+    ## Warning in for (n in 1:ncell) {: closing unused connection 7 (<-localhost:
+    ## 11079)
+
+    ## Warning in for (n in 1:ncell) {: closing unused connection 6 (<-localhost:
+    ## 11079)
+
+    ## Warning in for (n in 1:ncell) {: closing unused connection 5 (<-localhost:
+    ## 11079)
+
+    ## finished cell 2000 
+    ## finished cell 3000 
+    ## finished cell 4000 
+    ## finished cell 5000 
+    ## finished cell 6000 
+    ## finished cell 7000 
+    ## finished cell 8000 
+    ## finished cell 9000 
+    ## finished cell 10000 
+    ## finished cell 11000 
+    ## finished cell 12000 
+    ## finished cell 13000 
+    ## finished cell 14000 
+    ## finished cell 15000 
+    ## finished cell 16000 
+    ## finished cell 17000 
+    ## finished: 17784 cells
 
 ``` r
 for(s in 1:n.sim) {
@@ -128,21 +144,7 @@ for(s in 1:n.sim) {
 }
 ```
 
-    ## Year 1 - Fruiting...
-
-    ## Warning in .Internal(exists(x, envir, mode, inherits)): closing unused
-    ## connection 10 (<-localhost:11817)
-
-    ## Warning in .Internal(exists(x, envir, mode, inherits)): closing unused
-    ## connection 9 (<-localhost:11817)
-
-    ## Warning in .Internal(exists(x, envir, mode, inherits)): closing unused
-    ## connection 8 (<-localhost:11817)
-
-    ## Warning in .Internal(exists(x, envir, mode, inherits)): closing unused
-    ## connection 7 (<-localhost:11817)
-
-    ## Dispersing locally...Dispersing regionally...Establishing...Hitting capacity.
+    ## Year 1 - Fruiting...Dispersing locally...Dispersing regionally...Establishing...Hitting capacity.
     ## Year 2 - Fruiting...Dispersing locally...Dispersing regionally...Establishing...Hitting capacity.
     ## Year 3 - Fruiting...Dispersing locally...Dispersing regionally...Establishing...Hitting capacity.
     ## Year 4 - Fruiting...Dispersing locally...Dispersing regionally...Establishing...Hitting capacity.
