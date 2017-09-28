@@ -168,7 +168,7 @@
     # match xy combinations with cell IDs
     cat("determining neighborhood cell IDs...\n")
     if(g.p$n_cores > 1) {
-      c_i <- pblapply(n_i, cl=makeCluster(n_cores), FUN=function(x) 
+      c_i <- pblapply(n_i, cl=makeCluster(g.p$n_cores), FUN=function(x) 
         apply(x, 1, function(xi) which(lc.df[,1]==xi[1] & lc.df[,2]==xi[2])))
     } else {
       c_i <- pblapply(n_i, function(x) 
