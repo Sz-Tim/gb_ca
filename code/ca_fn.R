@@ -48,8 +48,8 @@
     if(simple) {
       for(t in 1:tmax){
         # 2. Pre-multiply compositional parameters
-        K.agg <- as.matrix(lc.df[,3:8]) %*% K
-        lambda.agg <- as.matrix(lc.df[,3:8]) %*% lambda
+        K.agg <- as.matrix(lc.df[,4:9]) %*% K
+        lambda.agg <- as.matrix(lc.df[,4:9]) %*% lambda
         
         # 3. Local growth
         cat("Year", t, "- Growing...")
@@ -70,7 +70,7 @@
     } else {
       for(t in 1:tmax) {
         # 2. Pre-multiply compositional parameters
-        lc.mx <- as.matrix(lc.df[,3:8])
+        lc.mx <- as.matrix(lc.df[,4:9])
         K.agg <- lc.mx %*% K
         fec.agg <- lc.mx %*% fec
         pr.f.agg <- lc.mx %*% pr.f
@@ -100,7 +100,7 @@
         
         # 7. Carrying capacity enforcement on adults
         cat("Hitting capacity.\n")
-        N[,t] <- pmin(N[,t], round(as.matrix(lc.df[,3:8]) %*% K))
+        N[,t] <- pmin(N[,t], round(as.matrix(lc.df[,4:9]) %*% K))
         N[,t+1] <- N[,t] + N.recruit
       }
     }
@@ -134,7 +134,7 @@
     ncell <- n.x*n.y
     nbr <- 2 * sdd.max + 1
     sdd.i <- array(0, dim=c(nbr, nbr, 2, ncell))
-    bird.hab.agg <- as.matrix(lc.df[,3:8]) %*% (bird.hab %>% divide_by(sum(.)))
+    bird.hab.agg <- as.matrix(lc.df[,4:9]) %*% (bird.hab %>% divide_by(sum(.)))
     
     # generate default dispersal probability matrix
     d.pr <- matrix(0, nbr, nbr)
