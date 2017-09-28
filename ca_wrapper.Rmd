@@ -11,7 +11,7 @@ The land cover within each cell is compositional rather than the more common har
 
 ```{r setup, include=FALSE}
 if(!require(sevcheck)) devtools::install_github("Sz-Tim/sevcheck")
-p_load("tidyverse", "pbapply", "magrittr", "stringr", "fastmatch")
+p_load("tidyverse", "magrittr", "stringr", "parallel", "pbapply", "fastmatch")
 theme_set(theme_bw())
 source("code/ca_fn.R")
 ```
