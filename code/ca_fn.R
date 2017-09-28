@@ -391,6 +391,23 @@
 ##########----------------------------------------------------------------------
 
 ##---
+## make cell-block reference
+##---
+make_cb_i <- function(blockSize) {
+  read_csv(paste0("data/roads_01_1a.csv")) %>% 
+    mutate(CellRow=1:n_distinct(top) %>% rep(n_distinct(left)),
+           CellCol=1:n_distinct(left) %>% rep(each=n_distinct(top))) %>%
+    filter((CellRow <= max((CellRow %/% blockSize) * blockSize)) &
+             (CellCol <= max((CellCol %/% blockSize) * blockSize))) %>%
+    mutate(BlockRow=((CellRow-1)%/%blockSize)+1, 
+           BlockCol=((CellCol-1)%/%blockSize)+1,
+           BlockID=paste(str_pad(BlockCol, 7, "left", "0"), 
+                         str_pad(BlockRow, 7, "left", "0"), sep=".") %>% 
+             as.numeric %>% factor %>% as.numeric) %>%
+    select(c(CellID, CellRow, CellCol, BlockID, BlockRow, BlockCol, left, top))
+}
+  
+##---
 ## add block IDs for aggregating acres
 ##---
 add_blocks <- function(x, cb.i=cb.i) {
