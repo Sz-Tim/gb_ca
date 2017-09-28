@@ -169,10 +169,10 @@
     # match xy combinations with cell IDs
     cat("determining neighborhood cell IDs...\n")
     if(g.p$n_cores > 1) {
-      c_i <- pblapply(n_i, function(x) fmatch(x, lc.df$x_y), 
+      c_i <- pblapply(n_i, function(x) fastmatch::fmatch(x, lc.df$x_y), 
                       cl=makeCluster(g.p$n_cores))
     } else {
-      c_i <- pblapply(n_i, function(x) fmatch(x, lc.df$x_y))
+      c_i <- pblapply(n_i, function(x) fastmatch::fmatch(x, lc.df$x_y))
     }
     
     
