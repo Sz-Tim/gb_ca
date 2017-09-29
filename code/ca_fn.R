@@ -168,28 +168,26 @@
     
     # match xy combinations with cell IDs
     cat("determining neighborhood cell IDs...\n")
+    pboptions(type="none")
     if(g.p$n_cores > 1) {
-      c_i <- pblapply(n_i, function(x) fastmatch::fmatch(x, lc.df$x_y), 
-                      cl=makeCluster(g.p$n_cores))
+      p.c <- makeCluster(g.p$n_cores)
+      c_i <- pblapply(n_i, function(x) fastmatch::fmatch(x, lc.df$x_y), cl=p.c)
+      stopCluster(p.c)
     } else {
       c_i <- pblapply(n_i, function(x) fastmatch::fmatch(x, lc.df$x_y))
     }
-    
     
     cat("calculating probabilities...\n")
     for(n in 1:ncell) {
       # find cell ID for each cell in neighborhood
       sdd.i[n_x[[n]][1]:n_x[[n]][2], n_y[[n]][1]:n_y[[n]][2],2,n] <- c_i[[n]]
-      
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
       sdd.i[,,1,n][ib] <- d.pr[ib] * bird.hab.agg[sdd.i[,,2,n][ib]]
-      
       # set cell ID to 0 if pr(target) == 0 
       sdd.i[,,2,n][sdd.i[,,1,n]==0] <- 0
-      
       # progress update
-      if(n %% 1000 == 0) {
+      if(n %% 5000 == 0) {
         cat("finished cell", n, "\n")
       }
     }
@@ -406,6 +404,8 @@ make_cb_i <- function(blockSize) {
              as.numeric %>% factor %>% as.numeric) %>%
     select(c(CellID, CellRow, CellCol, BlockID, BlockRow, BlockCol, left, top))
 }
+  
+  
   
 ##---
 ## add block IDs for aggregating acres
