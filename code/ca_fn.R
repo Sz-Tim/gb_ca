@@ -369,8 +369,9 @@
       N.rcrt[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,] +
                               N.sb[N.seed$id] * pr.est.agg[N.seed$id,]) %>% round
       if(bank) {
-        N.sb[N.seed$id] <- ((N.seed$N - N.rcrt[N.seed$id]) * 
-                              pr.sb.agg[N.seed$id]) %>% round
+        N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.agg[N.seed$id,]) + 
+                              N.seed$N - N.rcrt[N.seed$id]) * 
+          pr.sb.agg[N.seed$id]) %>% round
       } else {
         N.sb <- rep(0, ncell)
       }
