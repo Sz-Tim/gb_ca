@@ -157,8 +157,8 @@
     yy <- map(lc.df$y, ~seq(.-sdd.max, .+sdd.max))
 
     # create lists of inbounds xy neighborhood ranges
-    n_ix <- map(xx, ~.[.>0 & .<n.x])
-    n_iy <- map(yy, ~.[.>0 & .<n.y])
+    n_ix <- map(xx, ~.[.>0 & .<=n.x])
+    n_iy <- map(yy, ~.[.>0 & .<=n.y])
     
     # generate all xy combinations & neighborhood matrix indices
     cat("generating neighborhoods...\n")
