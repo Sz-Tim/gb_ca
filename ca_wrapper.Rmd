@@ -22,10 +22,10 @@ source("code/ca_fn.R")
 ## set parameters
 ##---
 
-  set.seed(25)
+  set.seed(225)
   n.sim <- 1
-  blockSize <- 2  # number of acres per block (width & height)
-  cb.i <- make_cb_i(blockSize)
+  blockSize <- 10  # number of acres per block (width & height)
+  cb.i <- make_cb_i(blockSize); summary(cb.i)
   g.p <- list(
     # general
     tmax=25,  # num time steps per simulation
@@ -34,15 +34,15 @@ source("code/ca_fn.R")
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=204,  # num rows in landscape
-    lc.c=271,  # num columns in landscape
+    lc.r=40,  # num rows in landscape
+    lc.c=54,  # num columns in landscape
     n.lc=6,  # num land cover categories
-    N.p.t0=20,  # num cells with buckthorn at t=1
+    N.p.t0=10,  # num cells with buckthorn at t=1
     
     # demography
     K=c(2000, 20, 400, 1200, 600, 600),  # carrying capacity
     pr.f=c(0.9, 0.1, 0.29, 0.23, 0.2, 0.3),  # pr(fruit)
-    fec=c(200, 100, 40, 20, 20, 10),  # mean(fruit per adult)
+    fec=c(300, 100, 40, 20, 20, 10),  # mean(fruit per adult)
     densDepF=FALSE,
     bank=TRUE,  # include seedbank?
     pr.sb=rep(0.3, 6),  # pr(ann.surv seed bank)
@@ -50,8 +50,8 @@ source("code/ca_fn.R")
     lambda=c(2.5, 0.5, 1.6, 1.9, 1.8, 1.3),  # pop growth rate
     
     # dispersal
-    sdd.max=2,  # max dispersal distance (unit: cells)
-    sdd.rate=0.05,  # 1/mn for dispersal kernel
+    sdd.max=10,  # max dispersal distance (unit: cells)
+    sdd.rate=0.1,  # 1/mn for dispersal kernel
     trunc.diag=TRUE,  # restrict dispersal to sdd.max radius
     pr.eat=c(0.6, 0.5, 0.5, 0.25, 0.2, 0.8),  # pr(birds eat frt)
     bird.hab=c(0.2, 0.2, 0.5, 2, 0.8, 0.5),  # bird habitat prefs
