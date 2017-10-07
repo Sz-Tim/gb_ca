@@ -86,27 +86,66 @@ source("code/ca_fn.R")
   N.init[p.0] <- (as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/2)) %>% round
   
   # dispersal probabilities
-  sdd.pr <- sdd_set_probs(lc.df, g.p)
+  system.time(sdd.pr <- sdd_set_probs(lc.df, g.p))
 ```
 
 ```{r runSim}
+system.time(
 for(s in 1:n.sim) {
   out <- run_sim(g.p, lc.df, sdd.pr, N.init, control.p=NULL)
 }
+)
 ```
 
 
-```{r plots}
+```{r plots, fig.height=8, fig.width=10}
 colnames(out) <- paste0("t_", 1:ncol(out))
 N.out <- cbind(lc.df, out) %>% as.tibble
 
+# buckthorn abundance
 for(t in 1:g.p$tmax) {
   p.t <- ggplot(N.out, aes(x=x, y=y)) + 
     geom_tile(aes_string(fill=paste0("t_", t))) + 
     scale_fill_gradient(low="white", high="red", 
                         limits=range(out[,-ncol(out)]))
   print(p.t)
+  ggsave(paste0("out/plots/n_", ncell, "_t_", t, ".jpg"), p.t,
+         width=10, height=7)
 }
+
+# land cover
+p.dev <- ggplot(N.out, aes(x=x, y=y, fill=Dev)) + geom_tile() + 
+  scale_fill_gradient(low="white", high="red", limits=c(0,1))
+ggsave(paste0("out/plots/n_", ncell, "_LC_Dev.jgp"), p.dev,
+         width=10, height=7)
+
+p.oth <- ggplot(N.out, aes(x=x, y=y, fill=Oth)) + geom_tile() + 
+  scale_fill_gradient(low="white", high="gray30", limits=c(0,1))
+ggsave(paste0("out/plots/n_", ncell, "_LC_Oth.jgp"), p.oth,
+         width=10, height=7)
+
+p.hwd <- ggplot(N.out, aes(x=x, y=y, fill=Hwd)) + geom_tile() + 
+  scale_fill_gradient(low="white", high="green3", limits=c(0,1))
+ggsave(paste0("out/plots/n_", ncell, "_LC_Hwd.jgp"), p.hwd,
+         width=10, height=7)
+
+p.wp <- ggplot(N.out, aes(x=x, y=y, fill=WP)) + geom_tile() + 
+  scale_fill_gradient(low="white", high="orchid", limits=c(0,1))
+ggsave(paste0("out/plots/n_", ncell, "_LC_WP.jgp"), p.wp,
+         width=10, height=7)
+
+p.evg <- ggplot(N.out, aes(x=x, y=y, fill=Evg)) + geom_tile() + 
+  scale_fill_gradient(low="white", high="darkgreen", limits=c(0,1))
+ggsave(paste0("out/plots/n_", ncell, "_LC_Evg.jgp"), p.evg,
+         width=10, height=7)
+
+p.mxd <- ggplot(N.out, aes(x=x, y=y, fill=Mxd)) + geom_tile() + 
+  scale_fill_gradient(low="white", high="yellowgreen", limits=c(0,1))
+ggsave(paste0("out/plots/n_", ncell, "_LC_Mxd.jgp"), p.mxd,
+         width=10, height=7)
+
+
+# buckthorn vs land cover
 ggplot(N.out, aes(x=Dev)) + 
   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
 ggplot(N.out, aes(x=Oth)) + 
