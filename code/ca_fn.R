@@ -280,10 +280,10 @@
     } else {
       if(stoch) {
         N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-          mutate(N.rpr = rbinom(n(), N[id]-N.recruit[id],
+          mutate(N.rpr = rbinom(n(), N.t[id]-N.recruit[id],
                                 prob=pr.f.agg[id]),
                  N.fruit = rpois(n(), 
-                                 lambda=fec.agg[id])) %>% 
+                                 lambda=N.rpr*fec.agg[id])) %>% 
           filter(N.fruit > 0)
       } else {
         N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
