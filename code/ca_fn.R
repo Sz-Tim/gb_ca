@@ -309,26 +309,36 @@
     #   cols(cell.ID, (N.seed = 2*(N.fruit - N.eaten + N.deposited)))
     #   nrow = sum(N.seed != 0)
     
+    # calculate seeds deposited within source cell vs emigrants
+    N.source <- N.f %>%
+      mutate(N.produced=(2.3*N.fruit),
+             N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.agg[id,],
+             N.drop=N.produced-N.emig)
+    N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
+    
     if(stoch) {
-      
+      N.seed$N.dep %<>% round
+      N.source$N.emig %<>% round
+      SDD_id <- apply(N.source, 1,
+                      function(x) sample(sdd.pr[,,2,x[1]], x[5], replace=TRUE,
+                                         prob=sdd.pr[,,1,x[1]]) %>%
+                        table %>% as.matrix) %>%
+        do.call("rbind", .)
+      N.seed %<>%
+        add_row(id=row.names(SDD_id) %>% as.numeric,
+                N.dep=SDD_id[,1]) 
     } else {
-      # calculate seeds deposited within source cell vs emigrants
-      N.source <- N.f %>%
-        mutate(N.produced=(2.3*N.fruit),
-               N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.agg[id,],
-               N.drop=N.produced-N.emig)
-      N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
-      
       # assign emigrants to target cells & sum within each cell
       N.seed %<>% 
         add_row(id=apply(N.source, 1, 
                          function(x) c(sdd.pr[,,2,x[1]])) %>% c, 
                 N.dep=apply(N.source, 1, 
                             function(x) c(x[5] * sdd.pr[,,1,x[1]])) %>% c) %>%
-        filter(N.dep > 0) %>%
-        group_by(id) %>% 
-        summarise(N=sum(N.dep) %>% round)
+        filter(N.dep > 0)
     }
+    N.seed %<>%
+      group_by(id) %>% 
+      summarise(N=sum(N.dep) %>% round)
     return(N.seed)
   }
 
