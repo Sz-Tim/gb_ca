@@ -306,7 +306,7 @@
     #   and the proportion of fruits eaten vs dropped
     # N.emig excludes seeds deposited within the source cell (1-pexp(0.5, rate))
     # Returns sparse matrix N.sdd with:
-    #   cols(cell.ID, (N.seed = 2*(N.fruit - N.eaten + N.deposited)))
+    #   cols(cell.ID, (N.seed = 2.3*(N.fruit - N.eaten + N.deposited)))
     #   nrow = sum(N.seed != 0)
     
     # calculate seeds deposited within source cell vs emigrants
@@ -317,16 +317,18 @@
     N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
     
     if(stoch) {
-      N.seed$N.dep %<>% round
-      N.source$N.emig %<>% round
-      SDD_id <- apply(N.source, 1,
-                      function(x) sample(sdd.pr[,,2,x[1]], x[5], replace=TRUE,
-                                         prob=sdd.pr[,,1,x[1]]) %>%
-                        table %>% as.matrix) %>%
-        do.call("rbind", .)
-      N.seed %<>%
-        add_row(id=row.names(SDD_id) %>% as.numeric,
-                N.dep=SDD_id[,1]) 
+      N.source.mx <- as.matrix(N.source[,c(1,5)])
+      N.seed$N.dep <- round(N.seed$N.dep)
+      N.source.mx[,2] <- round(N.source.mx[,2])
+      SDD_sd <- unlist(apply(N.source.mx, 1,
+                             function(x) sample(sdd.pr[,,2,x[1]], x[2], 
+                                                replace=TRUE,
+                                                prob=sdd.pr[,,1,x[1]])))
+      SDD_dep <- tabulate(SDD_sd)  # vector of counts for 1:max(SDD_sd)
+      SDD_nonzero <- SDD_dep > 0  # cell id's with N_dep > 0
+      N.seed <- add_row(N.seed, 
+                        id=which(SDD_nonzero), 
+                        N.dep=SDD_dep[SDD_nonzero])
     } else {
       # assign emigrants to target cells & sum within each cell
       N.seed %<>% 
