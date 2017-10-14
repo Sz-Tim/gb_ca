@@ -317,11 +317,9 @@
     N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
     
     if(stoch) {
-      N.source.mx <- as.matrix(N.source[,c(1,5)])
       N.seed$N.dep <- round(N.seed$N.dep)
-      N.source.mx[,2] <- round(N.source.mx[,2])
-      SDD_sd <- unlist(apply(N.source.mx, 1,
-                             function(x) sample(sdd.pr[,,2,x[1]], x[2], 
+      SDD_sd <- unlist(apply(N.source, 1,
+                             function(x) sample(sdd.pr[,,2,x[1]], x[5], 
                                                 replace=TRUE,
                                                 prob=sdd.pr[,,1,x[1]])))
       SDD_dep <- tabulate(SDD_sd)  # vector of counts for 1:max(SDD_sd)
