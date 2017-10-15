@@ -80,8 +80,7 @@
         
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
-        N.f <- make_fruits(N[,t], N.recruit, fec.agg, pr.f.agg, 
-                           K.agg, densDepF, stoch)
+        N.f <- make_fruits(N[,t], N.recruit, fec.agg, pr.f.agg, K.agg, stoch)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
@@ -251,8 +250,7 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(N.t, N.recruit, fec.agg, pr.f.agg, 
-                          K.agg, densDepF=F, stoch=F) {
+  make_fruits <- function(N.t, N.recruit, fec.agg, pr.f.agg, K.agg, stoch=F) {
     # Calculate (N.fruit | N, fec, K) for each cell
     # Fecundity rates & fruiting probabilities are habitat specific
     # Assumes no fruit production in first year
@@ -261,36 +259,18 @@
     #   col(id, N.rpr=num.reproducing, N.fruit=total.fruit)
     #   nrow = sum(N.frt != 0)
     
-    if(densDepF) {
-      if(stoch) {
-        N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-          mutate(N.rpr = rbinom(n(), N[id]-N.recruit[id],
-                                prob=pr.f.agg[id]),
-                 N.fruit = rpois(n(), 
-                                 lambda=fec.agg[id] * 
-                                   (K.agg[id]-N.rpr)/K.agg[id])) %>% 
-          filter(N.fruit > 0)
-      } else {
-        N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-          mutate(N.rpr=(N.t[id]-N.recruit[id]) * pr.f.agg[id,],
-                 N.fruit=(N.rpr * fec.agg[id,] *
-                            ((K.agg[id]-N.rpr)/K.agg[id])) %>% round) %>% 
-          filter(N.fruit > 0)
-      }
+    if(stoch) {
+      N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
+        mutate(N.rpr = rbinom(n(), N.t[id]-N.recruit[id],
+                              prob=pr.f.agg[id]),
+               N.fruit = rpois(n(), 
+                               lambda=N.rpr*fec.agg[id])) %>% 
+        filter(N.fruit > 0)
     } else {
-      if(stoch) {
-        N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-          mutate(N.rpr = rbinom(n(), N.t[id]-N.recruit[id],
-                                prob=pr.f.agg[id]),
-                 N.fruit = rpois(n(), 
-                                 lambda=N.rpr*fec.agg[id])) %>% 
-          filter(N.fruit > 0)
-      } else {
-        N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-          mutate(N.rpr=(N.t[id]-N.recruit[id]) * pr.f.agg[id,],
-                 N.fruit=(N.rpr * fec.agg[id,]) %>% round) %>% 
-          filter(N.fruit > 0)
-      }
+      N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
+        mutate(N.rpr=(N.t[id]-N.recruit[id]) * pr.f.agg[id,],
+               N.fruit=(N.rpr * fec.agg[id,]) %>% round) %>% 
+        filter(N.fruit > 0)
     }
     return(N.f)
   }
