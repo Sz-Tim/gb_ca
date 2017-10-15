@@ -352,13 +352,31 @@
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects & seedbank
     
+    N.rcrt <- rep(0, ncell)
     if(stoch) {
-      
-    } else {
-      N.rcrt <- rep(0, ncell)
-      N.rcrt[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,] +
-                              N.sb[N.seed$id] * pr.est.agg[N.seed$id,]) %>% round
+      N.rcrt[N.seed$id] <- rbinom(nrow(N.seed), N.seed$N, pr.est.agg[N.seed$id])
       if(bank) {
+        N.sbEst <- rep(0, ncell)
+        # N_est_sb
+        N.sbEst[N.seed$id] <- rbinom(nrow(N.seed), N.sb[N.seed$id], 
+                                     pr.est.agg[N.seed$id])
+        # N_est_tot = N_est + N_est_sb
+        N.rcrt[N.seed$id] <- N.rcrt[N.seed$id] + N.sbEst[N.seed$id]
+        # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
+        N.sb[N.seed$id] <- rbinom(nrow(N.seed),
+                                  N.sb[N.seed$id] + N.seed$N - N.rcrt[N.seed$id],
+                                  pr.sb.agg[N.seed$id])
+      } else {
+        N.sb <- rep(0, ncell)
+      }
+    } else {
+      # N_est = N_seed * p(est)
+      N.rcrt[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,])
+      if(bank) {
+        # N_est_tot = N_est + N_est_sb
+        N.rcrt[N.seed$id] <- N.rcrt[N.seed$id] + 
+          N.sb[N.seed$id] * pr.est.agg[N.seed$id,]
+        # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
         N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.agg[N.seed$id,]) + 
                               N.seed$N - N.rcrt[N.seed$id]) * 
           pr.sb.agg[N.seed$id]) %>% round
