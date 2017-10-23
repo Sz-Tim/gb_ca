@@ -16,18 +16,26 @@
   run_sim <- function(g.p, lc.df, sdd.pr, N.init, control.p=NULL) {
     # Runs the simulation, calling subsequent submodules
     # simple=T runs model with no fruits/seeds/seedlings -- lambda only
+    # Storage Structures:
+    #   N.lam: matrix(ncell, tmax+1) -- lambda model 
+    #   N: array(ncell, tmax+1, 8) -- hybrid model; age 1-7, adults
+    #   N.ling: vector(ncell) -- hybrid model; number of new seedlings for t+1
+    #   N.sb: vector(ncell) -- hybrid model; number of seeds in seedbank
     require(tidyverse); require(magrittr)
     
     # Unpack parameters
     tmax <- g.p$tmax
-    stoch <- g.p$stoch
+    dem.st <- g.p$dem.st
+    sdd.st <- g.p$sdd.st
     simple <- g.p$simple
     bank <- g.p$bank
     ncell <- g.p$lc.r * g.p$lc.c
     K <- g.p$K  # carrying capacity
+    K.y <- g.p$K.y
+    pr.s <- g.p$pr.s  # pre-adult survival
     pr.f <- g.p$pr.f  # pr(fruit)
     fec <- g.p$fec  # mean(fruit per adult)
-    densDepF <- g.p$densDepF  # density dependent fruiting
+    age.mat <- g.p$age.mat  # mean age at first fruiting
     pr.est <- g.p$pr.est  # pr(seedling est)
     pr.sb <- g.p$pr.sb  # pr(ann.surv seed bank)
     lambda <- g.p$lambda  # pop growth rate
@@ -38,14 +46,11 @@
     # If buckthorn is being actively managed...
     if(!is.null(control.p)) {}
     
-    
-    # 1. Initialize populations
-    N <- matrix(0, ncell, tmax+1)
-    N[,1] <- N.init
-    N.recruit <- rep(0, ncell)
-    N.sb <- rep(0, ncell)
-    
     if(simple) {
+      # 1. Initialize populations
+      N.lam <- matrix(0, ncell, tmax+1)  
+      N.lam[,1] <- rowSums(N.init)
+      
       for(t in 1:tmax){
         # 2. Pre-multiply compositional parameters
         K.agg <- as.matrix(lc.df[,4:9]) %*% K
@@ -53,11 +58,11 @@
         
         # 3. Local growth
         cat("Year", t, "- Growing...")
-        N.new <- grow_pops(N[,t], lambda.agg, K.agg, sdd.rate, stoch)
+        N.new <- grow_pops(N.lam[,t], lambda.agg, K.agg, sdd.rate, dem.st)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
-        N.emig <- sdd_simple(N[,t], N.new, sdd.pr, sdd.rate, K.agg, stoch)
+        N.emig <- sdd_simple(N.lam[,t], N.new, sdd.pr, sdd.rate, K.agg, sdd.st)
         
         # 5. Long distance dispersal
         cat("Dispersing regionally...")
@@ -68,10 +73,19 @@
         N[,t+1] <- N.emig$N
       }
     } else {
+      # 1. Initialize populations
+      N <- array(0, dim=c(ncell, tmax+1, 8))  
+      N[,1,] <- N.init
+      N.ling <- rep(0, ncell)
+      N.sb <- rep(0, ncell)
+      
       for(t in 1:tmax) {
         # 2. Pre-multiply compositional parameters
         lc.mx <- as.matrix(lc.df[,4:9])
         K.agg <- lc.mx %*% K
+        K.y.agg <- lc.mx %*% K.y
+        pr.s.agg <- lc.mx %*% pr.s
+        rel.dens <- t(apply(lc.mx, 1, function(x) K*x/c(x%*%K)))
         fec.agg <- lc.mx %*% fec
         pr.f.agg <- lc.mx %*% pr.f
         pr.eat.agg <- lc.mx %*% pr.eat
@@ -80,11 +94,12 @@
         
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
-        N.f <- make_fruits(N[,t], N.recruit, fec.agg, pr.f.agg, K.agg, stoch)
+        N.f <- make_fruits(N[,t,], lc.mx, age.mat, fec.agg, pr.f.agg,
+                           rel.dens, dem.st)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
-        N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, stoch)
+        N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st)
         
         # 5. Long distance dispersal
         cat("Dispersing regionally...")
@@ -93,14 +108,20 @@
         # 6. Seedling establishment
         cat("Establishing...")
         estab.out <- new_seedlings(ncell, N.seed, N.sb, pr.est.agg, pr.sb.agg,
-                                   stoch, bank)
-        N.recruit <- estab.out$N.rcrt
+                                   dem.st, bank)
+        N.ling <- estab.out$N.rcrt
         N.sb <- estab.out$N.sb
         
-        # 7. Carrying capacity enforcement on adults
-        cat("Hitting capacity.\n")
-        N[,t] <- pmin(N[,t], round(as.matrix(lc.df[,4:9]) %*% K))
-        N[,t+1] <- N[,t] + N.recruit
+        # 7. Update abundances
+        cat("Updating abundances.\n")
+        N[,t+1,8] <- pmin(round(N[,t,8] + N[,t,7]),
+                          round(K.agg + K.y.agg[,7]))
+        N[,t+1,2:7] <- pmin(round(N[,t,1:6]),
+                            round(K.y.agg[,1:6]))
+        # N[,t+1,8] <- pmin(round(N[,t,8] + N[,t,7] * pr.s.agg[,7]), 
+        #                   round(K.agg))
+        # N[,t+1,2:7] <- round(N[,t,1:6] * pr.s.agg[,1:6])
+        N[,t+1,1] <- N.ling
       }
     }
     return(N)
@@ -115,8 +136,9 @@
     # Assign base dispersal probabilities from each cell
     # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
     # trunc.diag: if TRUE, the sdd neighborhood is restricted to within sdd.max
-    #   including along diagonals; if FALSE, then sdd.max refers to the maximum
-    #   allowable horizontal & vertical distance from the source cell
+    #   in all directions; if FALSE, then sdd.max refers to the maximum
+    #   allowable horizontal & vertical distance from the source cell and the
+    #   resulting neighborhood is square
     # k=1 contains pr(SDD | center,i,j)
     # k=2 contains the ID for each cell in the neighborhood
     # Returns array with dim(i:disp.rows, j:disp.cols, k:2, n:ncell)
@@ -128,6 +150,7 @@
     bird.hab <- g.p$bird.hab
     trunc.diag <- g.p$trunc.diag
     
+    # initialize landscape & storage objects
     n.x <- max(lc.df[,1])
     n.y <- max(lc.df[,2])
     ncell <- n.x*n.y
@@ -201,14 +224,14 @@
 ##---
 ## local population growth: simple (a la Merow 2011)
 ##---
-  grow_pops <- function(N.t, lambda.agg, K.agg, sdd.rate, stoch=F) {
+  grow_pops <- function(N.t, lambda.agg, K.agg, sdd.rate, dem.st=F) {
     # Calculate updated population sizes after local reproduction 
     # Growth rates are habitat specific
     # Returns sparse dataframe N.new with:
     #   col(id, N.pop, N.new=pop.delta, N.pop.upd=N.pop+N.new.nonemigrants)
     #   nrow = sum(N.new != 0)
     
-    if(stoch) {
+    if(dem.st) {
       
     } else {
       N.id <- which(N.t>0)
@@ -229,7 +252,7 @@
 ##---
 ## short distance dispersal: simple
 ##---
-  sdd_simple <- function(N.t, N.new, sdd.pr, sdd.rate, K.agg, stoch=F) {
+  sdd_simple <- function(N.t, N.new, sdd.pr, sdd.rate, K.agg, sdd.st=F) {
     # Calculate (N.arrivals | N.new, sdd.probs)
     # Accounts for distance from source cell & bird habitat preference
     # Returns dataframe with total population sizes.
@@ -250,25 +273,35 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(N.t, N.recruit, fec.agg, pr.f.agg, K.agg, stoch=F) {
-    # Calculate (N.fruit | N, fec, K) for each cell
-    # Fecundity rates & fruiting probabilities are habitat specific
-    # Assumes no fruit production in first year
-    # N.fruit = (N-N.recruit)*pr(Fruit)*fec
+  make_fruits <- function(N.t, lc.mx, age.mat, fec.agg, pr.f.agg, 
+                          rel.dens, dem.st=F) {
+    # Calculate (N.fruit | N, fec, age.mat) for each cell
+    # fec, pr.f, & age.mat are habitat specific
+    # Assumes no fruit production before age.mat
+    # Individuals are assumed to be distributed among LC's relative to K:
+    # K.tot = K[1]*lc.mx[1] + ... + K[l]*lc.mx[l]
+    # N[l] = N.tot * K[l]*lc.mx[l]/K.tot
+    # N.mature = sum(N[,age.mat[l]:8])*K[l]*lc.mx[l]/K.tot
+    # N.fruit = N.mature*pr(Fruit)*fec
     # Returns sparse dataframe N.f with:
     #   col(id, N.rpr=num.reproducing, N.fruit=total.fruit)
     #   nrow = sum(N.frt != 0)
     
-    if(stoch) {
-      N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-        mutate(N.rpr = rbinom(n(), N.t[id]-N.recruit[id],
+    
+    # calculate N.mature in each LC in each cell
+    names(age.mat) <- colnames(lc.mx)
+    N.mature <- (map_df(age.mat, ~rowSums(N.t[,.:8])) * rel.dens) %>% 
+      rowSums %>% round
+    if(dem.st) {
+      N.f <- tibble(id = which(N.mature>0)) %>%
+        mutate(N.rpr = rbinom(n(), N.mature[id],
                               prob=pr.f.agg[id]),
                N.fruit = rpois(n(), 
                                lambda=N.rpr*fec.agg[id])) %>% 
         filter(N.fruit > 0)
     } else {
-      N.f <- tibble(id = which((N.t-N.recruit)>0)) %>%
-        mutate(N.rpr=(N.t[id]-N.recruit[id]) * pr.f.agg[id,],
+      N.f <- tibble(id = which(N.mature>0)) %>%
+        mutate(N.rpr=(N.mature[id]) * pr.f.agg[id,],
                N.fruit=(N.rpr * fec.agg[id,]) %>% round) %>% 
         filter(N.fruit > 0)
     }
@@ -280,7 +313,7 @@
 ##---
 ## short distance dispersal: fruits & seeds
 ##---
-  sdd_fs <- function(N.f, pr.eat.agg, sdd.pr, sdd.rate, stoch=F) {
+  sdd_fs <- function(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st=F) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
@@ -296,7 +329,7 @@
              N.drop=N.produced-N.emig)
     N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
     
-    if(stoch) {
+    if(sdd.st) {
       N.seed$N.dep <- round(N.seed$N.dep)
       SDD_sd <- unlist(apply(N.source, 1,
                              function(x) sample(sdd.pr[,,2,x[1]], x[5], 
@@ -348,12 +381,12 @@
 ## seed germination & establishment
 ##---
   new_seedlings <- function(ncell, N.seed, N.sb, pr.est.agg, pr.sb.agg,
-                            stoch=F, bank=F) {
+                            dem.st=F, bank=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects & seedbank
     
     N.rcrt <- rep(0, ncell)
-    if(stoch) {
+    if(dem.st) {
       N.rcrt[N.seed$id] <- rbinom(nrow(N.seed), N.seed$N, pr.est.agg[N.seed$id])
       if(bank) {
         N.sbEst <- rep(0, ncell)
@@ -374,8 +407,8 @@
       N.rcrt[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,])
       if(bank) {
         # N_est_tot = N_est + N_est_sb
-        N.rcrt[N.seed$id] <- N.rcrt[N.seed$id] + 
-          N.sb[N.seed$id] * pr.est.agg[N.seed$id,]
+        N.rcrt[N.seed$id] <- (N.rcrt[N.seed$id] + 
+          N.sb[N.seed$id] * pr.est.agg[N.seed$id,]) %>% round
         # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
         N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.agg[N.seed$id,]) + 
                               N.seed$N - N.rcrt[N.seed$id]) * 
