@@ -25,13 +25,13 @@
     
     # Unpack parameters
     tmax <- g.p$tmax
+    simple <- g.p$simple
     dem.st <- g.p$dem.st
     sdd.st <- g.p$sdd.st
-    simple <- g.p$simple
+    mat.d <- g.p$mat.d
     bank <- g.p$bank
     ncell <- g.p$lc.r * g.p$lc.c
     K <- g.p$K  # carrying capacity
-    K.y <- g.p$K.y
     pr.s <- g.p$pr.s  # pre-adult survival
     pr.f <- g.p$pr.f  # pr(fruit)
     fec <- g.p$fec  # mean(fruit per adult)
@@ -42,6 +42,7 @@
     sdd.rate <- g.p$sdd.rate  # 1/mn for dispersal kernel
     pr.eat <- g.p$pr.eat  # pr(birds eat frt)
     n.ldd <- g.p$n.ldd   # num long distance dispersal events per year
+    n.class <- max(g.p$age.mat)
     
     # If buckthorn is being actively managed...
     if(!is.null(control.p)) {}
