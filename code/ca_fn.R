@@ -28,7 +28,6 @@
     simple <- g.p$simple
     dem.st <- g.p$dem.st
     sdd.st <- g.p$sdd.st
-    mat.d <- g.p$mat.d
     bank <- g.p$bank
     ncell <- g.p$lc.r * g.p$lc.c
     K <- g.p$K  # carrying capacity
@@ -95,7 +94,7 @@
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
         N.f <- make_fruits(N[,t,], lc.mx, age.mat, fec.agg, pr.f.agg,
-                           n.class, rel.dens, dem.st, mat.d)
+                           n.class, rel.dens, dem.st)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
@@ -271,7 +270,7 @@
 ## local fruit production
 ##---
   make_fruits <- function(N.t, lc.mx, age.mat, fec.agg, pr.f.agg, 
-                          n.class, rel.dens, dem.st=F, mat.d=F) {
+                          n.class, rel.dens, dem.st=F) {
     # Calculate (N.fruit | N, fec, age.mat) for each cell
     # fec, pr.f, & age.mat are habitat specific
     # Assumes no fruit production before age.mat
@@ -286,10 +285,10 @@
     
     
     # calculate N.mature in each LC in each cell
-    if(mat.d) {  # does age at maturity differ by LC?
+    if(length(age.mat) > 1) {  # does age at maturity differ by LC?
       names(age.mat) <- colnames(lc.mx)
       N.mature <- (map_df(age.mat, 
-                          ~rowSums(matrix(N.t[,.:n.class]))) * rel.dens) %>% 
+                          ~rowSums(as.matrix(N.t[,.:n.class]))) * rel.dens) %>% 
         rowSums %>% round
     } else {
       N.mature <- N.t[,n.class]
