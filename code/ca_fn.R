@@ -74,7 +74,7 @@
       }
     } else {
       # 1. Initialize populations
-      N <- array(0, dim=c(ncell, tmax+1, 8))  
+      N <- array(0, dim=c(ncell, tmax+1, n.class))  
       N[,1,] <- N.init
       N.ling <- rep(0, ncell)
       N.sb <- rep(0, ncell)
@@ -83,8 +83,7 @@
         # 2. Pre-multiply compositional parameters
         lc.mx <- as.matrix(lc.df[,4:9])
         K.agg <- lc.mx %*% K
-        K.y.agg <- lc.mx %*% K.y
-        pr.s.agg <- lc.mx %*% pr.s
+        pr.s.agg <- c(lc.mx %*% pr.s)
         rel.dens <- t(apply(lc.mx, 1, function(x) K*x/c(x%*%K)))
         fec.agg <- lc.mx %*% fec
         pr.f.agg <- lc.mx %*% pr.f
@@ -95,7 +94,7 @@
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
         N.f <- make_fruits(N[,t,], lc.mx, age.mat, fec.agg, pr.f.agg,
-                           rel.dens, dem.st)
+                           n.class, rel.dens, dem.st, mat.d)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
@@ -114,17 +113,14 @@
         
         # 7. Update abundances
         cat("Updating abundances.\n")
-        N[,t+1,8] <- pmin(round(N[,t,8] + N[,t,7]),
-                          round(K.agg + K.y.agg[,7]))
-        N[,t+1,2:7] <- pmin(round(N[,t,1:6]),
-                            round(K.y.agg[,1:6]))
-        # N[,t+1,8] <- pmin(round(N[,t,8] + N[,t,7] * pr.s.agg[,7]), 
-        #                   round(K.agg))
-        # N[,t+1,2:7] <- round(N[,t,1:6] * pr.s.agg[,1:6])
+        N[,t+1,n.class] <- pmin(round(N[,t,n.class] + 
+                                        N[,t,n.class-1] * pr.s.agg),
+                          round(K.agg))
+        N[,t+1,2:(n.class-1)] <- round(N[,t,1:(n.class-2)] * pr.s.agg)
         N[,t+1,1] <- N.ling
       }
     }
-    return(N)
+    return(list(N=N, N.sb=N.sb))
   }
 
 
