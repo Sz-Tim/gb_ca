@@ -271,7 +271,7 @@
 ## local fruit production
 ##---
   make_fruits <- function(N.t, lc.mx, age.mat, fec.agg, pr.f.agg, 
-                          rel.dens, dem.st=F) {
+                          n.class, rel.dens, dem.st=F, mat.d=F) {
     # Calculate (N.fruit | N, fec, age.mat) for each cell
     # fec, pr.f, & age.mat are habitat specific
     # Assumes no fruit production before age.mat
@@ -286,9 +286,14 @@
     
     
     # calculate N.mature in each LC in each cell
-    names(age.mat) <- colnames(lc.mx)
-    N.mature <- (map_df(age.mat, ~rowSums(N.t[,.:8])) * rel.dens) %>% 
-      rowSums %>% round
+    if(mat.d) {  # does age at maturity differ by LC?
+      names(age.mat) <- colnames(lc.mx)
+      N.mature <- (map_df(age.mat, 
+                          ~rowSums(matrix(N.t[,.:n.class]))) * rel.dens) %>% 
+        rowSums %>% round
+    } else {
+      N.mature <- N.t[,n.class]
+    }
     if(dem.st) {
       N.f <- tibble(id = which(N.mature>0)) %>%
         mutate(N.rpr = rbinom(n(), N.mature[id],
