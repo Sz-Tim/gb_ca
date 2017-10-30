@@ -78,7 +78,7 @@
       N <- array(0, dim=c(ncell, tmax+1, n.class))  
       N[,1,] <- N.init
       N.ling <- rep(0, ncell)
-      N.sb <- rep(0, ncell)
+      N.sb <- matrix(0, nrow=ncell, ncol=tmax+1)
       
       for(t in 1:tmax) {
         # 2. Pre-multiply compositional parameters
@@ -107,10 +107,10 @@
         
         # 6. Seedling establishment
         cat("Establishing...")
-        estab.out <- new_seedlings(ncell, N.seed, N.sb, pr.est.agg, pr.sb.agg,
-                                   dem.st, bank)
+        estab.out <- new_seedlings(ncell, N.seed, N.sb[,t], pr.est.agg, 
+                                   pr.sb.agg, dem.st, bank)
         N.ling <- estab.out$N.rcrt
-        N.sb <- estab.out$N.sb
+        N.sb[,t+1] <- estab.out$N.sb
         
         # 7. Update abundances
         cat("Updating abundances.\n")
