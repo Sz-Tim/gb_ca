@@ -28,10 +28,11 @@ source("code/ca_fn.R")
   cb.i <- make_cb_i(blockSize); summary(cb.i)
   g.p <- list(
     # general
-    tmax=35,  # num time steps per simulation
+    tmax=50,  # num time steps per simulation
+    simple=FALSE,  # simple lambda growth vs. fruits/seeds
     dem.st=FALSE,  # include stochasticity in demography?
     sdd.st=TRUE,  # include stochasticity in SDD?
-    simple=FALSE,  # simple lambda growth vs. fruits/seeds
+    mat.d=FALSE,  # does age @ first fruiting vary by LC?
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
@@ -41,22 +42,11 @@ source("code/ca_fn.R")
     N.p.t0=50,  # num cells with buckthorn at t=1
     
     # demography
-    K=c(750, 10, 100, 100, 300, 100),  # K for 8+
-    K.y=rbind(seq(2000, 750, length.out=7),  # K for 1-7; OpI
-              seq(100, 10, length.out=7),  # K for 1-7; OpU
-              seq(1000, 100, length.out=7),  # K for 1-7; Dec
-              seq(1000, 300, length.out=7),  # K for 1-7; WP
-              seq(1000, 100, length.out=7),  # K for 1-7; Evg
-              seq(1000, 100, length.out=7)),  # K for 1-7; Mxd
-    # pr.s=rbind(seq(0.9, 0.95, length.out=7),
-    #            seq(0.1, 0.5, length.out=7),
-    #            seq(0.4, 0.9, length.out=7),
-    #            seq(0.7, 0.95, length.out=7),
-    #            seq(0.4, 0.9, length.out=7),
-    #            seq(0.4, 0.9, length.out=7)),  # pre-adult survival
+    K=c(750, 10, 100, 100, 300, 100),  # K for adults
+    pr.s=c(0.8, 0.1, 0.5, 0.5, 0.5, 0.5),  # pre-adult survival
     pr.f=c(0.9, 0.1, 0.29, 0.23, 0.2, 0.3),  # pr(fruit)
     fec=c(200, 100, 40, 20, 20, 10),  # mean(fruit per adult)
-    age.mat=c(3, 3, 7, 7, 7, 7),  # mean age at first fruiting
+    age.mat=4,  # age at first fruiting (length==n.lc if mat.d==TRUE)
     bank=TRUE,  # include seedbank?
     pr.sb=rep(0.3, 6),  # pr(ann.surv seed bank)
     pr.est=c(0.07, 0.01, 0.08, 0.02, 0.02, 0.03),  # pr(seedling est)
@@ -64,7 +54,7 @@ source("code/ca_fn.R")
     
     # dispersal
     sdd.max=25,  # max dispersal distance (unit: cells)
-    sdd.rate=0.001,  # 1/mn for dispersal kernel
+    sdd.rate=0.85,  # 1/mn for dispersal kernel
     trunc.diag=TRUE,  # restrict dispersal to sdd.max radius
     pr.eat=c(0.6, 0.5, 0.5, 0.25, 0.2, 0.8),  # pr(birds eat frt)
     bird.hab=c(0.2, 0.2, 0.5, 2, 0.8, 0.5),  # bird habitat prefs
@@ -94,10 +84,10 @@ source("code/ca_fn.R")
                   WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
   
   # populations
-  N.init <- matrix(0, ncell, 8)  # ages 1-7, adults
+  N.init <- matrix(0, ncell, max(g.p$age.mat))  # column for each age class
   p.0 <- sample(1:ncell, g.p$N.p.t0)
-  N.init[p.0,8] <- (as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/4)) %>% round
-  N.init[p.0,1:7] <- (N.init[p.0,8]/10) %>% round
+  N.init[p.0,ncol(N.init)] <- (as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/4)) %>% round
+  N.init[p.0,-ncol(N.init)] <- (N.init[p.0,ncol(N.init)]/10) %>% round
   
   # dispersal probabilities
   system.time(sdd.pr <- sdd_set_probs(lc.df, g.p))
@@ -113,7 +103,7 @@ for(s in 1:n.sim) {
 
 
 ```{r plots, fig.height=8, fig.width=10}
-out.ad <- out[,,8]
+out.ad <- out$N[,,4]
 colnames(out.ad) <- paste0("t_", 1:ncol(out.ad))
 N.out <- cbind(lc.df, out.ad) %>% as.tibble
 
