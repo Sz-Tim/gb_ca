@@ -24,7 +24,7 @@ source("code/ca_fn.R")
 
   set.seed(225)
   n.sim <- 1
-  blockSize <- 5  # number of acres per block (width & height)
+  blockSize <- 4  # number of acres per block (width & height)
   cb.i <- make_cb_i(blockSize); summary(cb.i)
   g.p <- list(
     # general
@@ -36,8 +36,8 @@ source("code/ca_fn.R")
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=81,  # num rows in landscape
-    lc.c=108,  # num columns in landscape
+    lc.r=102,  # num rows in landscape
+    lc.c=135,  # num columns in landscape
     n.lc=6,  # num land cover categories
     N.p.t0=50,  # num cells with buckthorn at t=1
     
@@ -53,11 +53,11 @@ source("code/ca_fn.R")
     lambda=c(2.5, 0.5, 1.1, 1.1, 1.8, 1.3),  # pop growth rate
     
     # dispersal
-    sdd.max=25,  # max dispersal distance (unit: cells)
-    sdd.rate=0.85,  # 1/mn for dispersal kernel
+    sdd.max=30,  # max dispersal distance (unit: cells)
+    sdd.rate=0.1,  # 1/mn for dispersal kernel
     trunc.diag=TRUE,  # restrict dispersal to sdd.max radius
-    pr.eat=c(0.6, 0.5, 0.5, 0.25, 0.2, 0.8),  # pr(birds eat frt)
-    bird.hab=c(0.2, 0.2, 0.5, 2, 0.8, 0.5),  # bird habitat prefs
+    pr.eat=c(0.3, 0.1, 0.2, 0.2, 0.2, 0.1),  # pr(birds eat frt)
+    bird.hab=c(2, 0.2, 0.5, 2, 0.8, 0.5),  # bird habitat prefs
     n.ldd=1   # num long distance dispersal events per year
   )
   
@@ -103,14 +103,15 @@ for(s in 1:n.sim) {
 
 
 ```{r plots, fig.height=8, fig.width=10}
-out.ad <- out$N.sb
+out.ad <- log(out$N.sb+1)
+# out.ad <- out$N[,,4]
 colnames(out.ad) <- paste0("t_", 1:ncol(out.ad))
 N.out <- cbind(lc.df, out.ad) %>% as.tibble
 
-ggplot(N.out, aes(x=x, y=y, fill=t_100)) + 
-    geom_tile() + 
-    scale_fill_gradient(low="white", high="red", 
-                        limits=range(out.ad[,-ncol(out.ad)]))
+# ggplot(N.out, aes(x=x, y=y, fill=t_100)) + 
+#     geom_tile() + 
+#     scale_fill_gradient(low="white", high="red", 
+#                         limits=range(out.ad[,-ncol(out.ad)]))
 
 # buckthorn abundance
 for(t in 1:g.p$tmax) {
@@ -123,7 +124,7 @@ for(t in 1:g.p$tmax) {
          p.t, width=10, height=7)
   p.t <- ggplot(N.out, aes(x=x, y=y)) + 
     geom_tile(aes_string(fill=paste0("t_", t))) + 
-    scale_fill_gradient(low="white", high="red", na.value="red", limits=c(0,0.5))
+    scale_fill_gradient(low="white", high="red", na.value="red", limits=c(0,0.1))
   ggsave(paste0("out/plots/n_", ncell, "_SB_PA_t_", t, ".jpg"),
          p.t, width=10, height=7)
 }
@@ -135,7 +136,7 @@ ggplot(N.out, aes(x=x, y=y, fill=lam)) + geom_tile() +
 # land cover
 p.dev <- ggplot(N.out, aes(x=x, y=y, fill=Dev)) + geom_tile() + 
   scale_fill_gradient(low="white", high="red", limits=c(0,1))
-ggsave(paste0("out/plots/n_", ncell, "_LC_Dev.jpg"), p.dev,
+ggsave(paste0("out/plots/n_", ncell, "_LC_Dev.tif"), p.dev,
          width=10, height=7)
 
 p.oth <- ggplot(N.out, aes(x=x, y=y, fill=Oth)) + geom_tile() + 
