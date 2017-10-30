@@ -28,7 +28,7 @@ source("code/ca_fn.R")
   cb.i <- make_cb_i(blockSize); summary(cb.i)
   g.p <- list(
     # general
-    tmax=50,  # num time steps per simulation
+    tmax=100,  # num time steps per simulation
     simple=FALSE,  # simple lambda growth vs. fruits/seeds
     dem.st=FALSE,  # include stochasticity in demography?
     sdd.st=TRUE,  # include stochasticity in SDD?
@@ -103,11 +103,11 @@ for(s in 1:n.sim) {
 
 
 ```{r plots, fig.height=8, fig.width=10}
-out.ad <- out$N[,,4]
+out.ad <- out$N.sb
 colnames(out.ad) <- paste0("t_", 1:ncol(out.ad))
 N.out <- cbind(lc.df, out.ad) %>% as.tibble
 
-ggplot(N.out, aes(x=x, y=y, fill=t_35)) + 
+ggplot(N.out, aes(x=x, y=y, fill=t_100)) + 
     geom_tile() + 
     scale_fill_gradient(low="white", high="red", 
                         limits=range(out.ad[,-ncol(out.ad)]))
@@ -119,8 +119,13 @@ for(t in 1:g.p$tmax) {
     scale_fill_gradient(low="white", high="red",
                         limits=range(out.ad[,-ncol(out.ad)]))
   print(p.t)
-  # ggsave(paste0("out/plots/n_", ncell, "_t_", t, ".jpg"),
-  #        p.t, width=10, height=7)
+  ggsave(paste0("out/plots/n_", ncell, "_SB_t_", t, ".jpg"),
+         p.t, width=10, height=7)
+  p.t <- ggplot(N.out, aes(x=x, y=y)) + 
+    geom_tile(aes_string(fill=paste0("t_", t))) + 
+    scale_fill_gradient(low="white", high="red", na.value="red", limits=c(0,0.5))
+  ggsave(paste0("out/plots/n_", ncell, "_SB_PA_t_", t, ".jpg"),
+         p.t, width=10, height=7)
 }
 
 N.out$lam <- as.matrix(lc.df[,4:9]) %*% g.p$lambda
