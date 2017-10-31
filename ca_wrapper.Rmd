@@ -56,7 +56,7 @@ source("code/ca_fn.R")
     sdd.rate=0.1,  # 1/mn for dispersal kernel
     trunc.diag=TRUE,  # restrict dispersal to sdd.max radius
     pr.eat=c(0.3, 0.1, 0.2, 0.2, 0.2, 0.1),  # pr(birds eat frt)
-    bird.hab=c(2, 0.2, 0.5, 2, 0.8, 0.5),  # bird habitat prefs
+    bird.hab=c(.35, .35, 0.05, 0.1, 0.1, 0.05),  # bird habitat prefs
     n.ldd=1   # num long distance dispersal events per year
   )
   
