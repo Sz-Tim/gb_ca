@@ -34,14 +34,14 @@
     pr.s <- g.p$pr.s  # pre-adult survival
     pr.f <- g.p$pr.f  # pr(fruit)
     fec <- g.p$fec  # mean(fruit per adult)
-    age.mat <- g.p$age.mat  # mean age at first fruiting
+    age.f <- g.p$age.f  # mean age at first fruiting
     pr.est <- g.p$pr.est  # pr(seedling est)
     pr.sb <- g.p$pr.sb  # pr(ann.surv seed bank)
     lambda <- g.p$lambda  # pop growth rate
     sdd.rate <- g.p$sdd.rate  # 1/mn for dispersal kernel
     pr.eat <- g.p$pr.eat  # pr(birds eat frt)
     n.ldd <- g.p$n.ldd   # num long distance dispersal events per year
-    n.class <- max(g.p$age.mat)
+    n.class <- max(g.p$age.f)
     
     # If buckthorn is being actively managed...
     if(!is.null(control.p)) {}
@@ -93,7 +93,7 @@
         
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
-        N.f <- make_fruits(N[,t,], lc.mx, age.mat, fec.agg, pr.f.agg,
+        N.f <- make_fruits(N[,t,], lc.mx, age.f, fec.agg, pr.f.agg,
                            n.class, rel.dens, dem.st)
         
         # 4. Short distance dispersal
@@ -266,15 +266,15 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(N.t, lc.mx, age.mat, fec.agg, pr.f.agg, 
+  make_fruits <- function(N.t, lc.mx, age.f, fec.agg, pr.f.agg, 
                           n.class, rel.dens, dem.st=F) {
-    # Calculate (N.fruit | N, fec, age.mat) for each cell
-    # fec, pr.f, & age.mat are habitat specific
-    # Assumes no fruit production before age.mat
+    # Calculate (N.fruit | N, fec, age.f) for each cell
+    # fec, pr.f, & age.f are habitat specific
+    # Assumes no fruit production before age.f
     # Individuals are assumed to be distributed among LC's relative to K:
     # K.tot = K[1]*lc.mx[1] + ... + K[l]*lc.mx[l]
     # N[l] = N.tot * K[l]*lc.mx[l]/K.tot
-    # N.mature = sum(N[,age.mat[l]:8])*K[l]*lc.mx[l]/K.tot
+    # N.mature = sum(N[,age.f[l]:8])*K[l]*lc.mx[l]/K.tot
     # N.fruit = N.mature*pr(Fruit)*fec
     # Returns sparse dataframe N.f with:
     #   col(id, N.rpr=num.reproducing, N.fruit=total.fruit)
@@ -282,9 +282,9 @@
     
     
     # calculate N.mature in each LC in each cell
-    if(length(age.mat) > 1) {  # does age at maturity differ by LC?
-      names(age.mat) <- colnames(lc.mx)
-      N.mature <- (map_df(age.mat, 
+    if(length(age.f) > 1) {  # does age at maturity differ by LC?
+      names(age.f) <- colnames(lc.mx)
+      N.mature <- (map_df(age.f, 
                           ~rowSums(as.matrix(N.t[,.:n.class]))) * rel.dens) %>% 
         rowSums %>% round
     } else {
