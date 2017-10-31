@@ -32,7 +32,6 @@ source("code/ca_fn.R")
     simple=FALSE,  # simple lambda growth vs. fruits/seeds
     dem.st=FALSE,  # include stochasticity in demography?
     sdd.st=TRUE,  # include stochasticity in SDD?
-    mat.d=FALSE,  # does age @ first fruiting vary by LC?
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
