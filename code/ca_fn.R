@@ -144,7 +144,6 @@
     sdd.max <- g.p$sdd.max
     sdd.rate <- g.p$sdd.rate
     bird.hab <- g.p$bird.hab
-    trunc.diag <- g.p$trunc.diag
     
     # initialize landscape & storage objects
     n.x <- max(lc.df[,1])
@@ -160,10 +159,8 @@
     for(i in 1:nbr) {
       for(j in i:nbr) {
         d.pr[i,j] <- dexp((i-ctr)^2 + (j-ctr)^2 - 0.5, sdd.rate)
-        if(trunc.diag) {
-          if( sqrt((i-ctr)^2 + (j-ctr)^2) > sdd.max ) {
-            d.pr[i,j] <- 0
-          }
+        if( sqrt((i-ctr)^2 + (j-ctr)^2) > sdd.max ) {
+          d.pr[i,j] <- 0
         }
         d.pr[j,i] <- d.pr[i,j]
       }
