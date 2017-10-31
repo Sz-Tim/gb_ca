@@ -28,24 +28,24 @@ source("code/ca_fn.R")
   cb.i <- make_cb_i(blockSize); summary(cb.i)
   g.p <- list(
     # general
-    tmax=100,  # num time steps per simulation
+    tmax=20,  # num time steps per simulation
     simple=FALSE,  # simple lambda growth vs. fruits/seeds
     dem.st=FALSE,  # include stochasticity in demography?
     sdd.st=TRUE,  # include stochasticity in SDD?
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=102,  # num rows in landscape
-    lc.c=135,  # num columns in landscape
+    lc.r=20,  # num rows in landscape
+    lc.c=20,  # num columns in landscape
     n.lc=6,  # num land cover categories
-    N.p.t0=50,  # num cells with buckthorn at t=1
+    N.p.t0=10,  # num cells with buckthorn at t=1
     
     # demography
     K=c(750, 10, 100, 100, 300, 100),  # K for adults
     pr.s=c(0.8, 0.1, 0.5, 0.5, 0.5, 0.5),  # pre-adult survival
     pr.f=c(0.9, 0.1, 0.29, 0.23, 0.2, 0.3),  # pr(fruit)
     fec=c(200, 100, 40, 20, 20, 10),  # mean(fruit per adult)
-    age.mat=4,  # age at first fruiting (length==n.lc if mat.d==TRUE)
+    age.mat=c(4,4,7,7,7,7),  # age @ first fruiting (length==n.lc | 1)
     bank=TRUE,  # include seedbank?
     pr.sb=rep(0.3, 6),  # pr(ann.surv seed bank)
     pr.est=c(0.07, 0.01, 0.08, 0.02, 0.02, 0.03),  # pr(seedling est)
