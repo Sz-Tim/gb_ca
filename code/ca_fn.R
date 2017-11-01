@@ -25,6 +25,7 @@
     
     # Unpack parameters
     tmax <- g.p$tmax
+    n.lc <- g.p$n.lc
     simple <- g.p$simple
     dem.st <- g.p$dem.st
     sdd.st <- g.p$sdd.st
@@ -41,7 +42,8 @@
     sdd.rate <- g.p$sdd.rate  # 1/mn for dispersal kernel
     pr.eat <- g.p$pr.eat  # pr(birds eat frt)
     n.ldd <- g.p$n.ldd   # num long distance dispersal events per year
-    n.class <- max(g.p$age.f)
+    y.ad <- max(g.p$age.f)
+    age.f.d <- length(age.f) > 1
     
     # If buckthorn is being actively managed...
     if(!is.null(control.p)) {}
@@ -74,27 +76,41 @@
       }
     } else {
       # 1. Initialize populations
-      N <- array(0, dim=c(ncell, tmax+1, n.class))  
-      N[,1,] <- N.init
-      N.ling <- rep(0, ncell)
       N.sb <- matrix(0, nrow=ncell, ncol=tmax+1)
+      if(age.f.d) {
+        N <- array(0, dim=c(ncell, tmax+1, n.lc, y.ad))  
+        N[,1,,] <- N.init
+        for(l in 1:n.lc) {
+          if(age.f[l] < y.ad) {
+            N[,,l,age.f[l]:(y.ad-1)] <- NA
+          }
+        }
+      } else {
+        N <- array(0, dim=c(ncell, tmax+1, y.ad))  
+        N[,1,] <- N.init
+      }
       
       for(t in 1:tmax) {
         # 2. Pre-multiply compositional parameters
         lc.mx <- as.matrix(lc.df[,4:9])
-        K.agg <- lc.mx %*% K
+        K.agg <- round(lc.mx %*% K)
+        K.lc <- round(t(t(lc.mx) * K))
         pr.s.agg <- c(lc.mx %*% pr.s)
         rel.dens <- t(apply(lc.mx, 1, function(x) K*x/c(x%*%K)))
         fec.agg <- lc.mx %*% fec
         pr.f.agg <- lc.mx %*% pr.f
         pr.eat.agg <- lc.mx %*% pr.eat
         pr.est.agg <- lc.mx %*% pr.est
-        pr.sb.agg <- lc.mx %*% pr.sb
         
         # 3. Local fruit production
         cat("Year", t, "- Fruiting...")
-        N.f <- make_fruits(N[,t,], lc.mx, age.f, fec.agg, pr.f.agg,
-                           n.class, rel.dens, dem.st)
+        if(age.f.d) {
+          N.t <- N[,t,,]
+        } else {
+          N.t <- N[,t,]
+        }
+        N.f <- make_fruits(N.t, lc.mx, age.f.d, fec.agg, pr.f.agg,
+                           y.ad, rel.dens, dem.st)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
@@ -107,18 +123,29 @@
         # 6. Seedling establishment
         cat("Establishing...")
         estab.out <- new_seedlings(ncell, N.seed, N.sb[,t], pr.est.agg, 
-                                   pr.sb.agg, dem.st, bank)
-        N.ling <- estab.out$N.rcrt
+                                   pr.sb, dem.st, bank)
         N.sb[,t+1] <- estab.out$N.sb
         
         # 7. Update abundances
         cat("Updating abundances.\n")
-        N[,t+1,n.class] <- pmin(round(N[,t,n.class] + 
-                                        N[,t,n.class-1] * pr.s.agg),
-                          round(K.agg))
-        N[,t+1,2:(n.class-1)] <- round(N[,t,1:(n.class-2)] * pr.s.agg)
-        N[,t+1,1] <- N.ling
+        if(age.f.d) {
+          for(l in 1:n.lc) {
+            N[,t+1,l,y.ad] <- pmin(round(N[,t,l,y.ad] + 
+                                           N[,t,l,age.f[l]-1] * pr.s[l]),
+                                   K.lc[,l])
+            N[,t+1,l,2:(age.f[l]-1)] <- round(N[,t,l,1:(age.f[l]-2)] * pr.s[l])
+            N[,t+1,l,1] <- round(estab.out$N.rcrt * rel.dens[,l])
+          }
+        } else {
+          N[,t+1,y.ad] <- pmin(round(N[,t,y.ad] + N[,t,y.ad-1] * pr.s.agg),
+                               K.agg)
+          N[,t+1,2:(y.ad-1)] <- round(N[,t,1:(y.ad-2)] * pr.s.agg)
+          N[,t+1,1] <- estab.out$N.rcrt
+        }
       }
+    }
+    if(age.f.d) {
+      N <- apply(N, c(1,2,4), sum, na.rm=TRUE)
     }
     return(list(N=N, N.sb=N.sb))
   }
@@ -266,8 +293,8 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(N.t, lc.mx, age.f, fec.agg, pr.f.agg, 
-                          n.class, rel.dens, dem.st=F) {
+  make_fruits <- function(N.t, lc.mx, age.f.d, fec.agg, pr.f.agg, 
+                          y.ad, rel.dens, dem.st=F) {
     # Calculate (N.fruit | N, fec, age.f) for each cell
     # fec, pr.f, & age.f are habitat specific
     # Assumes no fruit production before age.f
@@ -282,13 +309,16 @@
     
     
     # calculate N.mature in each LC in each cell
-    if(length(age.f) > 1) {  # does age at maturity differ by LC?
-      names(age.f) <- colnames(lc.mx)
-      N.mature <- (map_df(age.f, 
-                          ~rowSums(as.matrix(N.t[,.:n.class]))) * rel.dens) %>% 
-        rowSums %>% round
+    # if(length(age.f) > 1) {  # does age at maturity differ by LC?
+    #   names(age.f) <- colnames(lc.mx)
+    #   N.mature <- (map_df(age.f, 
+    #                       ~rowSums(as.matrix(N.t[,.:y.ad]))) * rel.dens) %>% 
+    #     rowSums %>% round
+    # } else {
+    if(age.f.d) {
+      N.mature <- rowSums(N.t[,,y.ad])
     } else {
-      N.mature <- N.t[,n.class]
+      N.mature <- N.t[,y.ad]
     }
     if(dem.st) {
       N.f <- tibble(id = which(N.mature>0)) %>%
@@ -378,7 +408,7 @@
 ##---
 ## seed germination & establishment
 ##---
-  new_seedlings <- function(ncell, N.seed, N.sb, pr.est.agg, pr.sb.agg,
+  new_seedlings <- function(ncell, N.seed, N.sb, pr.est.agg, pr.sb,
                             dem.st=F, bank=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects & seedbank
@@ -396,21 +426,20 @@
         # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
         N.sb[N.seed$id] <- rbinom(nrow(N.seed),
                                   N.sb[N.seed$id] + N.seed$N - N.rcrt[N.seed$id],
-                                  pr.sb.agg[N.seed$id])
+                                  pr.sb)
       } else {
         N.sb <- rep(0, ncell)
       }
     } else {
       # N_est = N_seed * p(est)
-      N.rcrt[N.seed$id] <- (N.seed$N * pr.est.agg[N.seed$id,])
+      N.rcrt[N.seed$id] <- N.seed$N * pr.est.agg[N.seed$id,]
       if(bank) {
         # N_est_tot = N_est + N_est_sb
         N.rcrt[N.seed$id] <- (N.rcrt[N.seed$id] + 
           N.sb[N.seed$id] * pr.est.agg[N.seed$id,]) %>% round
         # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
         N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.agg[N.seed$id,]) + 
-                              N.seed$N - N.rcrt[N.seed$id]) * 
-          pr.sb.agg[N.seed$id]) %>% round
+                              N.seed$N - N.rcrt[N.seed$id]) * pr.sb) %>% round
       } else {
         N.sb <- rep(0, ncell)
       }
@@ -419,8 +448,38 @@
   }
 
 
+  
+##---
+## initialize populations randomly
+##---
+pop_init <- function(ncell, g.p, lc.df) {
+  # Initialize populations randomly
+  # Adults: 50% K; Subadults: 10% K
+  # Accounts for age.f constant vs varying by LC
+  # Returns N.init: matrix (row=cell, col=age)
+  # Or array (row=cell, col=LC, layer=age)
+  
+  p.0 <- sample(1:ncell, g.p$N.p.t0)
+  y.ad <- max(g.p$age.f)  # adult age bin
+  if(length(g.p$age.f) == 1) {
+    N.init <- matrix(0, ncell, y.ad)  # column for each age class
+    N.init[p.0,y.ad] <- round(as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/2))
+    N.init[p.0,-y.ad] <- round(N.init[p.0,y.ad]/5)
+  } else {
+    N.init <- array(0, dim=c(ncell, g.p$n.lc, y.ad))
+    N.init[p.0,,y.ad] <- round(t(t(as.matrix(lc.df[p.0,4:9])) * g.p$K/2))
+    N.init[p.0,,-y.ad] <- round(N.init[p.0,,y.ad]/5)
+  }
+  return(N.init)
+}
 
 
+
+  
+  
+  
+  
+  
 
 
 
