@@ -103,32 +103,43 @@ out.sb <- log(out$N.sb+1)
 out.ad <- out$N[,,7]
 N.out <- cbind(lc.df, out.ad) %>% as.tibble %>%
   gather(year, N.adult, (1:ncol(out.ad)) + ncol(lc.df)) %>%
-  mutate(N.sb=c(out.sb))
+  mutate(N.sb=c(out.sb),
+         N.less5=c(out.sb > 0))
+N.out$N.less5 <- N.out$N.less5 + c(out.ad > 5)
+N.out$year <- str_pad(N.out$year, 3, "left", "0")
 
 ggplot(filter(N.out, year==g.p$tmax+1), aes(x=x, y=y, fill=N.adult)) +
     geom_tile() +
     scale_fill_gradient(low="white", high="red")
 
 # buckthorn abundance
-# N.out[,10:110] <- out.ad > 0
-# N.out[,10:110] <- N.out[,10:110] + (out.ad > 5)
 gifwd <- paste0("out/gifs/", ncell, "_t", g.p$tmax)
 adult.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.adult, frame=year)) + 
   geom_tile() + scale_fill_gradient(low="white", high="red") + 
-  ggtitle("Adult abundance")
+  ggtitle("Adult abundance. Year")
 sb.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.sb, frame=year)) + 
   geom_tile() + scale_fill_gradient(low="white", high="red") + 
-  ggtitle("log seed abundance")
+  ggtitle("log seed abundance. Year")
 adult.pa <- ggplot(N.out, aes(x=x, y=y, fill=N.adult>0, frame=year)) + 
-  geom_tile() + scale_fill_gradient(low="white", high="red") + 
-  ggtitle("Adult presence")
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle("Adult presence. Year")
 sb.pa <- ggplot(N.out, aes(x=x, y=y, fill=N.sb > 0, frame=year)) + 
-  geom_tile() + scale_fill_gradient(low="white", high="red") + 
-  ggtitle("Seed presence")
-gganimate(adult.ab, paste0(gifwd, "/ageDiff_Ab.gif"), interval=0.2)
-gganimate(sb.ab, paste0(gifwd, "/ageDiff_SB_Ab.gif"), interval=0.2)
-gganimate(adult.pa, paste0(gifwd, "/ageDiff_PA.gif"), interval=0.2)
-gganimate(sb.pa, paste0(gifwd, "/ageDiff_SB_PA.gif"), interval=0.2)
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle("Seed presence. Year")
+adult.lo <- ggplot(N.out, aes(x=x, y=y, fill=N.less5, frame=year)) +
+  geom_tile() + ggtitle("Blue: Adult density ≤ 5. Year") + 
+  scale_fill_gradient2(low="white", mid="blue", high="pink", midpoint=1)
+
+gganimate(adult.ab, paste0(gifwd, "/ageDiff_Ab.gif"), interval=0.2, 
+          ani.width=700, ani.height=500)
+gganimate(sb.ab, paste0(gifwd, "/ageDiff_SB_Ab.gif"), interval=0.2, 
+          ani.width=700, ani.height=500)
+gganimate(adult.pa, paste0(gifwd, "/ageDiff_PA.gif"), interval=0.2, 
+          ani.width=700, ani.height=500)
+gganimate(sb.pa, paste0(gifwd, "/ageDiff_SB_PA.gif"), interval=0.2, 
+          ani.width=700, ani.height=500)
+gganimate(adult.lo, paste0(gifwd, "/ageDiff_LoDens.gif"), interval=0.2, 
+          ani.width=700, ani.height=500)
 
 
 
