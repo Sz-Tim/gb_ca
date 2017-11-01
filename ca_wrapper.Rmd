@@ -11,7 +11,8 @@ The land cover within each cell is compositional rather than the more common har
 
 ```{r setup, include=FALSE}
 if(!require(sevcheck)) devtools::install_github("Sz-Tim/sevcheck")
-p_load("tidyverse", "magrittr", "stringr", "parallel", "pbapply", "fastmatch")
+p_load("tidyverse", "magrittr", "stringr", "parallel", 
+       "pbapply", "fastmatch", "gganimate")
 theme_set(theme_bw())
 source("code/ca_fn.R")
 ```
@@ -98,31 +99,37 @@ for(s in 1:n.sim) {
 
 
 ```{r plots, fig.height=8, fig.width=10}
-out.ad <- log(out$N.sb+1)
-# out.ad <- out$N[,,4]
-colnames(out.ad) <- paste0("t_", 1:ncol(out.ad))
-N.out <- cbind(lc.df, out.ad) %>% as.tibble
+out.sb <- log(out$N.sb+1)
+out.ad <- out$N[,,7]
+N.out <- cbind(lc.df, out.ad) %>% as.tibble %>%
+  gather(year, N.adult, (1:ncol(out.ad)) + ncol(lc.df)) %>%
+  mutate(N.sb=c(out.sb))
 
-# ggplot(N.out, aes(x=x, y=y, fill=t_100)) + 
-#     geom_tile() + 
-#     scale_fill_gradient(low="white", high="red", 
-#                         limits=range(out.ad[,-ncol(out.ad)]))
+ggplot(filter(N.out, year==g.p$tmax+1), aes(x=x, y=y, fill=N.adult)) +
+    geom_tile() +
+    scale_fill_gradient(low="white", high="red")
 
 # buckthorn abundance
-for(t in 1:g.p$tmax) {
-  p.t <- ggplot(N.out, aes(x=x, y=y)) + 
-    geom_tile(aes_string(fill=paste0("t_", t))) + 
-    scale_fill_gradient(low="white", high="red",
-                        limits=range(out.ad[,-ncol(out.ad)]))
-  print(p.t)
-  ggsave(paste0("out/plots/n_", ncell, "_SB_t_", t, ".jpg"),
-         p.t, width=10, height=7)
-  p.t <- ggplot(N.out, aes(x=x, y=y)) + 
-    geom_tile(aes_string(fill=paste0("t_", t))) + 
-    scale_fill_gradient(low="white", high="red", na.value="red", limits=c(0,0.1))
-  ggsave(paste0("out/plots/n_", ncell, "_SB_PA_t_", t, ".jpg"),
-         p.t, width=10, height=7)
-}
+# N.out[,10:110] <- out.ad > 0
+# N.out[,10:110] <- N.out[,10:110] + (out.ad > 5)
+gifwd <- paste0("out/gifs/", ncell, "_t", g.p$tmax)
+adult.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.adult, frame=year)) + 
+  geom_tile() + scale_fill_gradient(low="white", high="red") + 
+  ggtitle("Adult abundance")
+sb.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.sb, frame=year)) + 
+  geom_tile() + scale_fill_gradient(low="white", high="red") + 
+  ggtitle("log seed abundance")
+adult.pa <- ggplot(N.out, aes(x=x, y=y, fill=N.adult>0, frame=year)) + 
+  geom_tile() + scale_fill_gradient(low="white", high="red") + 
+  ggtitle("Adult presence")
+sb.pa <- ggplot(N.out, aes(x=x, y=y, fill=N.sb > 0, frame=year)) + 
+  geom_tile() + scale_fill_gradient(low="white", high="red") + 
+  ggtitle("Seed presence")
+gganimate(adult.ab, paste0(gifwd, "/ageDiff_Ab.gif"), interval=0.2)
+gganimate(sb.ab, paste0(gifwd, "/ageDiff_SB_Ab.gif"), interval=0.2)
+gganimate(adult.pa, paste0(gifwd, "/ageDiff_PA.gif"), interval=0.2)
+gganimate(sb.pa, paste0(gifwd, "/ageDiff_SB_PA.gif"), interval=0.2)
+
 
 N.out$lam <- as.matrix(lc.df[,4:9]) %*% g.p$lambda
 ggplot(N.out, aes(x=x, y=y, fill=lam)) + geom_tile() +
