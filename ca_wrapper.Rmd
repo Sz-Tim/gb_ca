@@ -43,7 +43,7 @@ source("code/ca_fn.R")
     
     # demography
     K=c(750, 10, 100, 100, 300, 100),  # K for adults
-    pr.s=c(0.8, 0.1, 0.5, 0.5, 0.5, 0.5),  # pre-adult survival
+    pr.s=c(0.9, 0.1, 0.6, 0.6, 0.6, 0.6),  # pre-adult survival
     pr.f=c(0.9, 0.1, 0.29, 0.23, 0.2, 0.3),  # pr(fruit)
     fec=c(200, 100, 40, 20, 20, 10),  # mean(fruit per adult)
     age.f=c(4,4,7,7,7,7),  # age @ first fruiting (length==n.lc | 1)
