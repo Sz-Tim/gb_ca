@@ -130,22 +130,8 @@ gganimate(sb.ab, paste0(gifwd, "/ageDiff_SB_Ab.gif"), interval=0.2)
 gganimate(adult.pa, paste0(gifwd, "/ageDiff_PA.gif"), interval=0.2)
 gganimate(sb.pa, paste0(gifwd, "/ageDiff_SB_PA.gif"), interval=0.2)
 
-for(t in 1:g.p$tmax) {
-  p.t <- ggplot(N.out, aes(x=x, y=y)) + 
-    geom_tile(aes_string(fill=paste0("t_", t))) +
-    # scale_fill_gradient2(low="white", mid="blue", high="pink", midpoint=1)
-    scale_fill_gradient(low="white", high="red",
-                        limits=range(out.ad[,-ncol(out.ad)]))
-  print(p.t)
-  ggsave(paste0("out/plots/n_", ncell, "_ageDiff_SB_t_", t, ".jpg"),
-         p.t, width=10, height=7)
-  p.t <- ggplot(N.out, aes(x=x, y=y)) +
-    geom_tile(aes_string(fill=paste0("t_", t))) +
-    scale_fill_gradient(low="white", high="red", na.value="red", limits=c(0,0.1))
-  ggsave(paste0("out/plots/n_", ncell, "_ageDiff_SB_PA_t_", t, ".jpg"),
-         p.t, width=10, height=7)
-}
->>>>>>> 223d3bec653efa799954179b75bd70eee96847d6
+
+
 
 N.out$lam <- as.matrix(lc.df[,4:9]) %*% g.p$lambda
 ggplot(N.out, aes(x=x, y=y, fill=lam)) + geom_tile() +
