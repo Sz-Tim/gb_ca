@@ -82,10 +82,7 @@ source("code/ca_fn.R")
                   WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
   
   # populations
-  N.init <- matrix(0, ncell, max(g.p$age.mat))  # column for each age class
-  p.0 <- sample(1:ncell, g.p$N.p.t0)
-  N.init[p.0,ncol(N.init)] <- (as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/4)) %>% round
-  N.init[p.0,-ncol(N.init)] <- (N.init[p.0,ncol(N.init)]/10) %>% round
+  N.init <- pop_init(ncell, g.p, lc.df)
   
   # dispersal probabilities
   system.time(sdd.pr <- sdd_set_probs(lc.df, g.p))
