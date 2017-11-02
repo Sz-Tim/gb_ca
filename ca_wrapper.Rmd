@@ -54,7 +54,7 @@ source("code/ca_fn.R")
     
     # dispersal
     sdd.max=30,  # max dispersal distance (unit: cells)
-    sdd.rate=0.1,  # 1/mn for dispersal kernel
+    sdd.rate=0.7,  # 1/mn for dispersal kernel
     pr.eat=c(0.3, 0.1, 0.2, 0.2, 0.2, 0.1),  # pr(birds eat frt)
     bird.hab=c(.35, .35, 0.05, 0.1, 0.1, 0.05),  # bird habitat prefs
     pr.s.bird=0.6,  # seed viability post-digestion
