@@ -100,7 +100,7 @@ for(s in 1:n.sim) {
 
 ```{r plots, fig.height=8, fig.width=10}
 out.sb <- log(out$N.sb+1)
-out.ad <- out$N[,,7]
+out.ad <- out$N[,,max(g.p$age.f)]
 N.out <- cbind(lc.df, out.ad) %>% as.tibble %>%
   gather(year, N.adult, (1:ncol(out.ad)) + ncol(lc.df)) %>%
   mutate(N.sb=c(out.sb),
@@ -108,12 +108,29 @@ N.out <- cbind(lc.df, out.ad) %>% as.tibble %>%
 N.out$N.less5 <- N.out$N.less5 + c(out.ad > 5)
 N.out$year <- str_pad(N.out$year, 3, "left", "0")
 
-ggplot(filter(N.out, year==g.p$tmax+1), aes(x=x, y=y, fill=N.adult)) +
-    geom_tile() +
-    scale_fill_gradient(low="white", high="red")
+# final time step
+adult.ab.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                       aes(x=x, y=y, fill=N.adult)) +
+  geom_tile() + scale_fill_gradient(low="white", high="red") +
+  ggtitle(paste("Adult abundance. Year", g.p$tmax+1))
+sb.ab.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                    aes(x=x, y=y, fill=N.sb)) +
+  geom_tile() + scale_fill_gradient(low="white", high="red") +
+  ggtitle(paste("log seed abundance. Year", g.p$tmax+1))
+adult.pa.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                       aes(x=x, y=y, fill=N.adult>0)) +
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle(paste("Adult presence. Year", g.p$tmax+1))
+sb.pa.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                    aes(x=x, y=y, fill=N.sb>0)) +
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle(paste("Seed presence. Year", g.p$tmax+1))
 
-# buckthorn abundance
-gifwd <- paste0("out/gifs/", ncell, "_t", g.p$tmax)
+# gifs
+gifwd <- paste0("out/gifs/", ncell, "_t", g.p$tmax, "/")
+age.i <- ifelse(length(g.p$age.f)==1, 
+                paste0("age", g.p$age.f, ""),
+                paste0("ages", min(g.p$age.f), "-", max(g.p$age.f), ""))
 adult.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.adult, frame=year)) + 
   geom_tile() + scale_fill_gradient(low="white", high="red") + 
   ggtitle("Adult abundance. Year")
@@ -130,16 +147,25 @@ adult.lo <- ggplot(N.out, aes(x=x, y=y, fill=N.less5, frame=year)) +
   geom_tile() + ggtitle("Blue: Adult density ≤ 5. Year") + 
   scale_fill_gradient2(low="white", mid="blue", high="pink", midpoint=1)
 
-gganimate(adult.ab, paste0(gifwd, "/ageDiff_Ab.gif"), interval=0.2, 
-          ani.width=700, ani.height=500)
-gganimate(sb.ab, paste0(gifwd, "/ageDiff_SB_Ab.gif"), interval=0.2, 
-          ani.width=700, ani.height=500)
-gganimate(adult.pa, paste0(gifwd, "/ageDiff_PA.gif"), interval=0.2, 
-          ani.width=700, ani.height=500)
-gganimate(sb.pa, paste0(gifwd, "/ageDiff_SB_PA.gif"), interval=0.2, 
-          ani.width=700, ani.height=500)
-gganimate(adult.lo, paste0(gifwd, "/ageDiff_LoDens.gif"), interval=0.2, 
-          ani.width=700, ani.height=500)
+# save plots
+ggsave(paste0(gifwd, "Final_Ab_", age.i, ".jpg"), adult.ab.fin,
+       width=8, height=6, units="in")
+ggsave(paste0(gifwd, "Final_SB_Ab_", age.i, ".jpg"), sb.ab.fin,
+       width=8, height=6, units="in")
+ggsave(paste0(gifwd, "Final_PA_", age.i, ".jpg"), adult.pa.fin,
+       width=8, height=6, units="in")
+ggsave(paste0(gifwd, "Final_SB_PA_", age.i, ".jpg"), sb.pa.fin,
+       width=8, height=6, units="in")
+gganimate(adult.ab, paste0(gifwd, "Ab_", age.i, ".gif"), 
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(sb.ab, paste0(gifwd, "SB_Ab_", age.i, ".gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(adult.pa, paste0(gifwd, "PA_", age.i, ".gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(sb.pa, paste0(gifwd, "SB_PA_", age.i, ".gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(adult.lo, paste0(gifwd, "LoDens_", age.i, ".gif"),
+          interval=0.2, ani.width=800, ani.height=600)
 
 
 
