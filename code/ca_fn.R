@@ -41,6 +41,7 @@
     lambda <- g.p$lambda  # pop growth rate
     sdd.rate <- g.p$sdd.rate  # 1/mn for dispersal kernel
     pr.eat <- g.p$pr.eat  # pr(birds eat frt)
+    pr.s.bird <- g.p$pr.s.bird  # pr(viable | digestion)
     n.ldd <- g.p$n.ldd   # num long distance dispersal events per year
     y.ad <- max(g.p$age.f)
     age.f.d <- length(age.f) > 1
@@ -114,7 +115,7 @@
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
-        N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st)
+        N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st, pr.s.bird)
         
         # 5. Long distance dispersal
         cat("Dispersing regionally...")
@@ -341,7 +342,7 @@
 ##---
 ## short distance dispersal: fruits & seeds
 ##---
-  sdd_fs <- function(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st=F) {
+  sdd_fs <- function(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st=F, pr.s.bird) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
@@ -354,7 +355,8 @@
     N.source <- N.f %>%
       mutate(N.produced=(2.3*N.fruit),
              N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.agg[id,],
-             N.drop=N.produced-N.emig)
+             N.drop=N.produced-N.emig) %>%
+      mutate(N.emig=N.emig*pr.s.bird)
     N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
     
     if(sdd.st) {
