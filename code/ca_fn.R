@@ -111,7 +111,7 @@
           N.t <- N[,t,]
         }
         N.f <- make_fruits(N.t, lc.mx, age.f.d, fec.agg, pr.f.agg,
-                           y.ad, rel.dens, dem.st)
+                           y.ad, dem.st)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
@@ -295,7 +295,7 @@
 ## local fruit production
 ##---
   make_fruits <- function(N.t, lc.mx, age.f.d, fec.agg, pr.f.agg, 
-                          y.ad, rel.dens, dem.st=F) {
+                          y.ad, dem.st=F) {
     # Calculate (N.fruit | N, fec, age.f) for each cell
     # fec, pr.f, & age.f are habitat specific
     # Assumes no fruit production before age.f
@@ -310,12 +310,6 @@
     
     
     # calculate N.mature in each LC in each cell
-    # if(length(age.f) > 1) {  # does age at maturity differ by LC?
-    #   names(age.f) <- colnames(lc.mx)
-    #   N.mature <- (map_df(age.f, 
-    #                       ~rowSums(as.matrix(N.t[,.:y.ad]))) * rel.dens) %>% 
-    #     rowSums %>% round
-    # } else {
     if(age.f.d) {
       N.mature <- rowSums(N.t[,,y.ad])
     } else {
