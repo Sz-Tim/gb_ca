@@ -56,16 +56,16 @@
       
       for(t in 1:tmax){
         # 2. Pre-multiply compositional parameters
-        K.agg <- as.matrix(lc.df[,4:9]) %*% K
-        lambda.agg <- as.matrix(lc.df[,4:9]) %*% lambda
+        K.ag <- as.matrix(lc.df[,4:9]) %*% K
+        lambda.ag <- as.matrix(lc.df[,4:9]) %*% lambda
         
         # 3. Local growth
         cat("Year", t, "- Growing...")
-        N.new <- grow_pops(N.lam[,t], lambda.agg, K.agg, sdd.rate, dem.st)
+        N.new <- grow_pops(N.lam[,t], lambda.ag, K.ag, sdd.rate, dem.st)
         
         # 4. Short distance dispersal
         cat("Dispersing locally...")
-        N.emig <- sdd_simple(N.lam[,t], N.new, sdd.pr, sdd.rate, K.agg, sdd.st)
+        N.emig <- sdd_simple(N.lam[,t], N.new, sdd.pr, sdd.rate, K.ag, sdd.st)
         
         # 5. Long distance dispersal
         cat("Dispersing regionally...")
@@ -92,42 +92,39 @@
       }
       
       for(t in 1:tmax) {
-        # 2. Pre-multiply compositional parameters
-        lc.mx <- as.matrix(lc.df[,4:9])
-        K.agg <- round(lc.mx %*% K)
-        K.lc <- round(t(t(lc.mx) * K))
-        pr.s.agg <- c(lc.mx %*% pr.s)
-        rel.dens <- t(apply(lc.mx, 1, function(x) K*x/c(x%*%K)))
-        fec.agg <- lc.mx %*% fec
-        pr.f.agg <- lc.mx %*% pr.f
-        pr.eat.agg <- lc.mx %*% pr.eat
-        pr.est.agg <- lc.mx %*% pr.est
+        # 2. Implement management
+        if(!is.null(control.p)) {
+          
+        }
         
-        # 3. Local fruit production
+        # 3. Pre-multiply compositional parameters
+        pm <- premultiply(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est)
+        
+        # 4. Local fruit production
         cat("Year", t, "- Fruiting...")
         if(age.f.d) {
           N.t <- N[,t,,]
         } else {
           N.t <- N[,t,]
         }
-        N.f <- make_fruits(N.t, lc.mx, age.f.d, fec.agg, pr.f.agg,
+        N.f <- make_fruits(N.t, pm$lc.mx, age.f.d, pm$fec.ag, pm$pr.f.ag,
                            y.ad, dem.st)
         
-        # 4. Short distance dispersal
+        # 5. Short distance dispersal
         cat("Dispersing locally...")
-        N.seed <- sdd_fs(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st, pr.s.bird)
+        N.seed <- sdd_fs(N.f, pm$pr.eat.ag, sdd.pr, sdd.rate, sdd.st, pr.s.bird)
         
-        # 5. Long distance dispersal
+        # 6. Long distance dispersal
         cat("Dispersing regionally...")
         N.seed <- ldd_disperse(ncell, N.seed, n.ldd, simple=FALSE)
         
-        # 6. Seedling establishment
+        # 7. Seedling establishment
         cat("Establishing...")
-        estab.out <- new_seedlings(ncell, N.seed, N.sb[,t], pr.est.agg, 
+        estab.out <- new_seedlings(ncell, N.seed, N.sb[,t], pm$pr.est.ag, 
                                    pr.sb, dem.st, bank)
         N.sb[,t+1] <- estab.out$N.sb
         
-        # 7. Update abundances
+        # 8. Update abundances
         cat("Updating abundances.\n")
         if(age.f.d) {
           for(l in 1:n.lc) {
@@ -138,9 +135,9 @@
             N[,t+1,l,1] <- round(estab.out$N.rcrt * rel.dens[,l])
           }
         } else {
-          N[,t+1,y.ad] <- pmin(round(N[,t,y.ad] + N[,t,y.ad-1] * pr.s.agg),
-                               K.agg)
-          N[,t+1,2:(y.ad-1)] <- round(N[,t,1:(y.ad-2)] * pr.s.agg)
+          N[,t+1,y.ad] <- pmin(round(N[,t,y.ad] + N[,t,y.ad-1] * pr.s.ag),
+                               K.ag)
+          N[,t+1,2:(y.ad-1)] <- round(N[,t,1:(y.ad-2)] * pr.s.ag)
           N[,t+1,1] <- estab.out$N.rcrt
         }
       }
@@ -179,7 +176,7 @@
     ncell <- n.x*n.y
     nbr <- 2 * sdd.max + 1
     sdd.i <- array(0, dim=c(nbr, nbr, 2, ncell))
-    bird.hab.agg <- as.matrix(lc.df[,4:9]) %*% (bird.hab %>% divide_by(sum(.)))
+    bird.hab.ag <- as.matrix(lc.df[,4:9]) %*% (bird.hab %>% divide_by(sum(.)))
     
     # generate default dispersal probability matrix
     d.pr <- matrix(0, nbr, nbr)
@@ -226,7 +223,7 @@
       sdd.i[n_x[[n]][1]:n_x[[n]][2], n_y[[n]][1]:n_y[[n]][2],2,n] <- c_i[[n]]
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
-      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.hab.agg[sdd.i[,,2,n][ib]]
+      sdd.i[,,1,n][ib] <- d.pr[ib] * bird.hab.ag[sdd.i[,,2,n][ib]]
       # set cell ID to 0 if pr(target) == 0 
       sdd.i[,,2,n][sdd.i[,,1,n]==0] <- 0
       # progress update
@@ -245,7 +242,7 @@
 ##---
 ## local population growth: simple (a la Merow 2011)
 ##---
-  grow_pops <- function(N.t, lambda.agg, K.agg, sdd.rate, dem.st=F) {
+  grow_pops <- function(N.t, lambda.ag, K.ag, sdd.rate, dem.st=F) {
     # Calculate updated population sizes after local reproduction 
     # Growth rates are habitat specific
     # Returns sparse dataframe N.new with:
@@ -256,11 +253,11 @@
       
     } else {
       N.id <- which(N.t>0)
-      lam.id <- lambda.agg[N.id]
+      lam.id <- lambda.ag[N.id]
       N.new <- tibble(id = which(N.t>0)) %>%
         mutate(N.pop=N.t[id],
                N.new=(N.pop * (lam.id-1)),
-               N.pop.upd=pmin(K.agg[N.id,],
+               N.pop.upd=pmin(K.ag[N.id,],
                               N.pop + 
                                 (lam.id>=1)*N.new*pexp(0.5, sdd.rate) +
                                 (lam.id<1)*N.new) %>% round)
@@ -273,7 +270,7 @@
 ##---
 ## short distance dispersal: simple
 ##---
-  sdd_simple <- function(N.t, N.new, sdd.pr, sdd.rate, K.agg, sdd.st=F) {
+  sdd_simple <- function(N.t, N.new, sdd.pr, sdd.rate, K.ag, sdd.st=F) {
     # Calculate (N.arrivals | N.new, sdd.probs)
     # Accounts for distance from source cell & bird habitat preference
     # Returns dataframe with total population sizes.
@@ -285,7 +282,7 @@
                                       sdd.pr[,,1,x[1]])) %>% c) %>%
       filter(id != 0) %>% group_by(id) %>%
       summarise(N=sum(N))
-    N.emig %<>% mutate(N=pmin(K.agg[N.emig$id,], N) %>% round)
+    N.emig %<>% mutate(N=pmin(K.ag[N.emig$id,], N) %>% round)
     return(N.emig)
   }
   
@@ -294,7 +291,7 @@
 ##---
 ## local fruit production
 ##---
-  make_fruits <- function(N.t, lc.mx, age.f.d, fec.agg, pr.f.agg, 
+  make_fruits <- function(N.t, lc.mx, age.f.d, fec.ag, pr.f.ag, 
                           y.ad, dem.st=F) {
     # Calculate (N.fruit | N, fec, age.f) for each cell
     # fec, pr.f, & age.f are habitat specific
@@ -318,14 +315,14 @@
     if(dem.st) {
       N.f <- tibble(id = which(N.mature>0)) %>%
         mutate(N.rpr = rbinom(n(), N.mature[id],
-                              prob=pr.f.agg[id]),
+                              prob=pr.f.ag[id]),
                N.fruit = rpois(n(), 
-                               lambda=N.rpr*fec.agg[id])) %>% 
+                               lambda=N.rpr*fec.ag[id])) %>% 
         filter(N.fruit > 0)
     } else {
       N.f <- tibble(id = which(N.mature>0)) %>%
-        mutate(N.rpr=(N.mature[id]) * pr.f.agg[id,],
-               N.fruit=(N.rpr * fec.agg[id,]) %>% round) %>% 
+        mutate(N.rpr=(N.mature[id]) * pr.f.ag[id,],
+               N.fruit=(N.rpr * fec.ag[id,]) %>% round) %>% 
         filter(N.fruit > 0)
     }
     return(N.f)
@@ -336,7 +333,7 @@
 ##---
 ## short distance dispersal: fruits & seeds
 ##---
-  sdd_fs <- function(N.f, pr.eat.agg, sdd.pr, sdd.rate, sdd.st=F, pr.s.bird) {
+  sdd_fs <- function(N.f, pr.eat.ag, sdd.pr, sdd.rate, sdd.st=F, pr.s.bird) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
@@ -348,7 +345,7 @@
     # calculate seeds deposited within source cell vs emigrants
     N.source <- N.f %>%
       mutate(N.produced=(2.3*N.fruit),
-             N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.agg[id,],
+             N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.ag[id,],
              N.drop=N.produced-N.emig) %>%
       mutate(N.emig=N.emig*pr.s.bird)
     N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
@@ -404,19 +401,19 @@
 ##---
 ## seed germination & establishment
 ##---
-  new_seedlings <- function(ncell, N.seed, N.sb, pr.est.agg, pr.sb,
+  new_seedlings <- function(ncell, N.seed, N.sb, pr.est.ag, pr.sb,
                             dem.st=F, bank=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects & seedbank
     
     N.rcrt <- rep(0, ncell)
     if(dem.st) {
-      N.rcrt[N.seed$id] <- rbinom(nrow(N.seed), N.seed$N, pr.est.agg[N.seed$id])
+      N.rcrt[N.seed$id] <- rbinom(nrow(N.seed), N.seed$N, pr.est.ag[N.seed$id])
       if(bank) {
         N.sbEst <- rep(0, ncell)
         # N_est_sb
         N.sbEst[N.seed$id] <- rbinom(nrow(N.seed), N.sb[N.seed$id], 
-                                     pr.est.agg[N.seed$id])
+                                     pr.est.ag[N.seed$id])
         # N_est_tot = N_est + N_est_sb
         N.rcrt[N.seed$id] <- N.rcrt[N.seed$id] + N.sbEst[N.seed$id]
         # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
@@ -428,13 +425,13 @@
       }
     } else {
       # N_est = N_seed * p(est)
-      N.rcrt[N.seed$id] <- N.seed$N * pr.est.agg[N.seed$id,]
+      N.rcrt[N.seed$id] <- N.seed$N * pr.est.ag[N.seed$id,]
       if(bank) {
         # N_est_tot = N_est + N_est_sb
         N.rcrt[N.seed$id] <- (N.rcrt[N.seed$id] + 
-          N.sb[N.seed$id] * pr.est.agg[N.seed$id,]) %>% round
+          N.sb[N.seed$id] * pr.est.ag[N.seed$id,]) %>% round
         # N_to_sb = (N_sb_notEst + N_addedToSB) * p(SB)
-        N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.agg[N.seed$id,]) + 
+        N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.ag[N.seed$id,]) + 
                               N.seed$N - N.rcrt[N.seed$id]) * pr.sb) %>% round
       } else {
         N.sb <- rep(0, ncell)
@@ -524,6 +521,39 @@ expand_v <- function(x,y) {
   paste(rep.int(x, length(y)), 
         rep.int(y, rep.int(length(x),length(y))),
         sep="_")
+}
+
+
+
+##---
+## premultiply compositional data
+##---
+premultiply <- function(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est) {
+  # reformats and calculates cell-means based on land cover composition
+  # for relevant parameters. Specifically:
+  #  lc.mx: matrix(col=LC, row=cell) with LC proportions
+  #  K.ag: vector(cell) with total K
+  #  K.lc: matrix(col=LC, row=cell) with K per LC
+  #  pr.s.ag: vector(cell) with pr(surv)
+  #  rel.dens: matrix(col=LC, row=cell) with relative density among LC
+  #  fec.ag: vector(cell) with mn(fruit per adult)
+  #  pr.f.ag: vector(cell) with pr(fruit)
+  #  pr.eat.ag: vector(cell) with pr(eaten by bird)
+  #  pr.est.ag: vector(cell) with pr(establish)
+  
+  lc.mx <- as.matrix(lc.df[,4:9])
+  K.ag <- round(lc.mx %*% K)
+  K.lc <- round(t(t(lc.mx) * K))
+  rel.dens <- t(apply(lc.mx, 1, function(x) K*x/c(x%*%K)))
+  pr.s.ag <- c(lc.mx %*% pr.s)
+  fec.ag <- lc.mx %*% fec
+  pr.f.ag <- lc.mx %*% pr.f
+  pr.eat.ag <- lc.mx %*% pr.eat
+  pr.est.ag <- lc.mx %*% pr.est
+  
+  return(list(lc.mx=lc.mx, K.ag=K.ag, K.lc=K.lc, rel.dens=rel.dens,
+              pr.s.ag=pr.s.ag, fec.ag=fec.ag, pr.f.ag=pr.f.ag,
+              pr.eat.ag=pr.eat.ag, pr.est.ag=pr.est.ag))
 }
 
 
