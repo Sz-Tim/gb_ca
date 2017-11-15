@@ -47,7 +47,15 @@
     age.f.d <- length(age.f) > 1
     
     # If buckthorn is being actively managed...
-    if(!is.null(control.p)) {}
+    pr.est.trt <- NULL
+    if(!is.null(control.p)) {
+      lc.trt <- control.p$lc.trt
+      est.trt <- control.p$est.trt
+      N.trt <- control.p$N.trt
+      grd.trt <- control.p$grd.trt
+      man.trt <- control.p$man.trt
+      t.trt <- control.p$t.trt
+    }
     
     if(simple) {
       # 1. Initialize populations
@@ -92,21 +100,68 @@
       }
       
       for(t in 1:tmax) {
-        # 2. Implement management
-        if(!is.null(control.p)) {
-          
-        }
-        
-        # 3. Pre-multiply compositional parameters
-        pm <- premultiply(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est)
-        
-        # 4. Local fruit production
-        cat("Year", t, "- Fruiting...")
         if(age.f.d) {
           N.t <- N[,t,,]
         } else {
           N.t <- N[,t,]
         }
+        
+        # 2. Implement management
+        if(!is.null(control.p) & t >= t.trt) {
+          # run function to implement management controls
+          # controls may be on whole cells or specific LCs of specific cells
+          # controls may affect:
+          #  - LC % (e.g., extreme timber harvest)
+          #  - pr.est (e.g., litter or cover crops)
+          #  - N (e.g., cutting and spraying)
+          # Inputs need to specify which LCs & cells will be affected, which
+          # method or methods will be used, and potentially the intensity of
+          # the method manifested in the decrease in N or pr.est.
+          # Ultimately, a new set of inputs will be provided in each year 
+          # depending on decisions made in the economic model.
+          #
+          # Starting simple, the method will affect entire cells with a percent
+          # reduction in N or a reassignment to a value of pr.est. 
+          # The treatment will be applied to entire cells starting in year 25.
+          # For now, the inputs (all sparse) will be:
+          #  - lc.trt: df(col=c(CellID, Hwd, WP, Evg, Mxd)) % change to OpI
+          #  - est.trt: df(col=c(CellID, Trt)) where Trt=Litter|Cover|Compact
+          #  - N.trt: df(col=c(CellID, Trt)) where Trt=Mech|Chem|MechChem
+          # The Trt levels in est.trt & N.trt have associated %'s hard coded
+          # in as parameters. 
+          # Thus, control.p is a list with the above df's as well as:
+          #  - grd.trt: vector(Litter=p.est, Cover=p.est, Compact=p.est)
+          #  - man.trt: vector(Mech=%kill, Chem=%kill, MechChem=%kill)
+          #
+          # For future complexity, manual.trt could also push a proportion of
+          # the adults back to a previous age so they don't fruit for a number
+          # of years after the treatment rather than being killed explicitly
+          # 
+          # The best approach probably partitions the calculations into separate
+          # functions and replaces the corresponding structure accordingly.
+          
+          # A. Adjust LC %
+          
+          # B. Adjust p.est
+          if(!is.null(est.trt)) {
+            pr.est.trt <- ground_trt(est.trt, grd.trt)
+          }
+          
+          # C. Adjust N
+          if(!is.null(N.trt)) {
+            if(age.f.d) {
+              N[,t,,] <- manual_trt(N.t, y.ad, N.trt, man.trt)
+            } else {
+              N[,t,] <- manual_trt(N.t, y.ad, N.trt, man.trt)
+            }
+          }
+        }
+        
+        # 3. Pre-multiply compositional parameters
+        pm <- premultiply(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est, pr.est.trt)
+        
+        # 4. Local fruit production
+        cat("Year", t, "- Fruiting...")
         N.f <- make_fruits(N.t, pm$lc.mx, age.f.d, pm$fec.ag, pm$pr.f.ag,
                            y.ad, dem.st)
         
@@ -130,13 +185,13 @@
           for(l in 1:n.lc) {
             N[,t+1,l,y.ad] <- pmin(round(N[,t,l,y.ad] + 
                                            N[,t,l,age.f[l]-1] * pr.s[l]),
-                                   K.lc[,l])
+                                   pm$K.lc[,l])
             N[,t+1,l,2:(age.f[l]-1)] <- round(N[,t,l,1:(age.f[l]-2)] * pr.s[l])
-            N[,t+1,l,1] <- round(estab.out$N.rcrt * rel.dens[,l])
+            N[,t+1,l,1] <- round(estab.out$N.rcrt * pm$rel.dens[,l])
           }
         } else {
           N[,t+1,y.ad] <- pmin(round(N[,t,y.ad] + N[,t,y.ad-1] * pr.s.ag),
-                               K.ag)
+                               pm$K.ag)
           N[,t+1,2:(y.ad-1)] <- round(N[,t,1:(y.ad-2)] * pr.s.ag)
           N[,t+1,1] <- estab.out$N.rcrt
         }
@@ -468,6 +523,33 @@ pop_init <- function(ncell, g.p, lc.df) {
 
 
 
+##---
+## implement ground cover treatments
+##---
+ground_trt <- function(est.trt, grd.trt) {
+  # given cells, treatments, and treatment effects: adjust pr.est
+  pr.est.trt <- tibble(id=est.trt$CellID,
+                       pr.est=grd.trt[match(est.trt$Trt, names(grd.trt))])
+  return(pr.est.trt)
+}
+
+
+
+##---
+## implement cutting & spraying treatments
+##---
+manual_trt <- function(N.t, y.ad, N.trt, man.trt) {
+  # given cells, treatments, and treatment effects: adjust N.adults
+  prop.kill <- tibble(id=N.trt$CellID,
+                      prop=1-man.trt[match(N.trt$Trt, names(man.trt))])
+  if(length(dim(N.t)) == 2) {
+    N.t[prop.kill$id,y.ad] <- round(N.t[prop.kill$id,y.ad] * prop.kill$prop)
+  } else {
+    N.t[prop.kill$id,,y.ad] <- round(N.t[prop.kill$id,,y.ad] * prop.kill$prop)
+  }
+  return(N.t)
+}
+
   
   
   
@@ -528,7 +610,8 @@ expand_v <- function(x,y) {
 ##---
 ## premultiply compositional data
 ##---
-premultiply <- function(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est) {
+premultiply <- function(lc.df, K, pr.s, fec, pr.f, pr.eat, 
+                        pr.est, pr.est.trt=NULL) {
   # reformats and calculates cell-means based on land cover composition
   # for relevant parameters. Specifically:
   #  lc.mx: matrix(col=LC, row=cell) with LC proportions
@@ -540,6 +623,8 @@ premultiply <- function(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est) {
   #  pr.f.ag: vector(cell) with pr(fruit)
   #  pr.eat.ag: vector(cell) with pr(eaten by bird)
   #  pr.est.ag: vector(cell) with pr(establish)
+  # If !is.na(pr.s.trt), then the associated pr.s.ag values are substituted in
+  # the cells that received a relevant management treatments
   
   lc.mx <- as.matrix(lc.df[,4:9])
   K.ag <- round(lc.mx %*% K)
@@ -550,6 +635,10 @@ premultiply <- function(lc.df, K, pr.s, fec, pr.f, pr.eat, pr.est) {
   pr.f.ag <- lc.mx %*% pr.f
   pr.eat.ag <- lc.mx %*% pr.eat
   pr.est.ag <- lc.mx %*% pr.est
+  
+  if(!is.null(pr.est.trt)) {
+    pr.est.ag[pr.est.trt$id,] <- pr.est.trt$pr.est
+  }
   
   return(list(lc.mx=lc.mx, K.ag=K.ag, K.lc=K.lc, rel.dens=rel.dens,
               pr.s.ag=pr.s.ag, fec.ag=fec.ag, pr.f.ag=pr.f.ag,
