@@ -15,6 +15,21 @@ p_load("tidyverse", "magrittr", "stringr", "parallel",
        "pbapply", "fastmatch", "gganimate")
 theme_set(theme_bw())
 source("code/ca_fn.R")
+grnt <- read_csv("data/grnt_all.csv") %>%
+  mutate(x=as.numeric(as.factor(.$left)),
+         y=as.numeric(factor(.$top, levels=rev(levels(factor(.$top))))),
+         x_y=paste(x, y, sep="_"))
+lc.rct <- as.tibble(expand.grid(x=1:max(grnt$x),
+                                y=1:max(grnt$y))) %>%
+  mutate(x_y=paste(x, y, sep="_")) %>%
+  mutate(OpI=grnt$OpI[match(.$x_y, grnt$x_y)], 
+         Oth=grnt$Oth[match(.$x_y, grnt$x_y)], 
+         Dec=grnt$Dec[match(.$x_y, grnt$x_y)], 
+         Evg=grnt$Evg[match(.$x_y, grnt$x_y)], 
+         WP=grnt$WP[match(.$x_y, grnt$x_y)], 
+         Mxd=grnt$Mxd[match(.$x_y, grnt$x_y)],
+         inbd=!is.na(match(.$x_y, grnt$x_y)))
+lc.rct[is.na(lc.rct)] <- 0
 ```
 
 
@@ -25,19 +40,17 @@ source("code/ca_fn.R")
 
   set.seed(225)
   n.sim <- 1
-  blockSize <- 4  # number of acres per block (width & height)
-  cb.i <- make_cb_i(blockSize); summary(cb.i)
   g.p <- list(
     # general
-    tmax=100,  # num time steps per simulation
+    tmax=20,  # num time steps per simulation
     simple=FALSE,  # simple lambda growth vs. fruits/seeds
     dem.st=FALSE,  # include stochasticity in demography?
     sdd.st=TRUE,  # include stochasticity in SDD?
     n_cores=4,  # parallelize sdd.pr calculation
     
     # landscape
-    lc.r=102,  # num rows in landscape
-    lc.c=135,  # num columns in landscape
+    lc.r=30,  # num rows in landscape
+    lc.c=30,  # num columns in landscape
     n.lc=6,  # num land cover categories
     N.p.t0=50,  # num cells with buckthorn at t=1
     
@@ -46,25 +59,24 @@ source("code/ca_fn.R")
     pr.s=c(0.9, 0.1, 0.6, 0.6, 0.6, 0.6),  # pre-adult survival
     pr.f=c(0.9, 0.1, 0.29, 0.23, 0.2, 0.3),  # pr(fruit)
     fec=c(200, 100, 40, 20, 20, 10),  # mean(fruit per adult)
-    age.f=rep(c(3,5), c(2,4)),  # age @ first fruiting (length==n.lc | 1)
+    age.f=3,#rep(c(3,5), c(2,4)),  # age @ first fruiting (length==n.lc | 1)
     bank=TRUE,  # include seedbank?
     pr.sb=0.3,  # pr(ann.surv seed bank)
     pr.est=c(0.07, 0.01, 0.08, 0.02, 0.02, 0.03),  # pr(seedling est)
     lambda=c(1.5, 0.5, 1.0, 0.9, 1.2, 1.1),  # pop growth rate
     
     # dispersal
-    sdd.max=20,  # max dispersal distance (unit: cells)
-    sdd.rate=0.1,  # 1/mn for dispersal kernel
+    sdd.max=5,#20,  # max dispersal distance (unit: cells)
+    sdd.rate=1,#0.1,  # 1/mn for dispersal kernel
     pr.eat=c(0.3, 0.1, 0.2, 0.2, 0.2, 0.1),  # pr(birds eat fruit)
     bird.hab=c(.35, .35, 0.05, 0.1, 0.1, 0.05),  # bird habitat prefs
     pr.s.bird=0.6,  # seed viability post-digestion
     n.ldd=1   # num long distance dispersal events per year
   )
-  ncell <- g.p$lc.r*g.p$lc.c
   
   control.p <- list(
-    nTrt_grd=0.05*ncell,
-    nTrt_man=0.05*ncell,
+    nTrt_grd=0.05,  # % of cells treated in each time step
+    nTrt_man=0.05,  # % of cells treated in each time step
     grd.trt=c(Lit=0.005, Cov=0.01, Com=0.00001),
     man.trt=c(M=0.1, C=0.3, MC=0.8),
     t.trt=50
@@ -77,20 +89,10 @@ source("code/ca_fn.R")
 ##--
   
   # land cover
-  Block.inc <- cb.i$BlockID[cb.i$BlockCol <= g.p$lc.c &
-                            cb.i$BlockRow <= g.p$lc.r] %>% unique
-  
-  grnt <- read_csv(paste0("data/out_01_1a_grnt.csv")) %>% 
-    mutate(CellID=1:nrow(.)) %>% add_blocks(cb.i=cb.i) %>% 
-    summarise(Dev=sum(V1)/n(), Oth=sum(V2)/n(), Hwd=sum(V3)/n(), 
-              WP=sum(V4)/n(), Evg=sum(V5)/n(), Mxd=sum(V6)/n()) %>%
-    filter(BlockID %in% Block.inc) 
-  
-  lc.df <- tibble(x=cb.i$BlockCol[match(grnt$BlockID, cb.i$BlockID)],
-                  y=cb.i$BlockRow[match(grnt$BlockID, cb.i$BlockID)],
-                  x_y=paste(x,y,sep="_"),
-                  Dev=grnt$Dev, Oth=grnt$Oth, Hwd=grnt$Hwd,
-                  WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
+  lc.df <- lc.rct %>% filter(y >= (max(lc.rct$y) - g.p$lc.r) & x <= g.p$lc.c) %>%
+    mutate(id=row_number())
+  ncell <- nrow(lc.df)
+    
   
   # populations
   N.init <- pop_init(ncell, g.p, lc.df)
