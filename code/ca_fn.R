@@ -49,12 +49,13 @@
     # If buckthorn is being actively managed...
     pr.est.trt <- NULL
     if(!is.null(control.p)) {
-      lc.trt <- control.p$lc.trt
-      est.trt <- control.p$est.trt
-      N.trt <- control.p$N.trt
+      nTrt_grd <- control.p$nTrt_grd
+      nTrt_man <- control.p$nTrt_man
       grd.trt <- control.p$grd.trt
       man.trt <- control.p$man.trt
       t.trt <- control.p$t.trt
+      est.trt <- tibble(CellID=numeric(), Trt=character())
+      N.trt <- tibble(CellID=numeric(), Trt=character())
     }
     
     if(simple) {
@@ -120,35 +121,33 @@
           # Ultimately, a new set of inputs will be provided in each year 
           # depending on decisions made in the economic model.
           #
-          # Starting simple, the method will affect entire cells with a percent
-          # reduction in N or a reassignment to a value of pr.est. 
-          # The treatment will be applied to entire cells starting in year 25.
           # For now, the inputs (all sparse) will be:
           #  - lc.trt: df(col=c(CellID, Hwd, WP, Evg, Mxd)) % change to OpI
           #  - est.trt: df(col=c(CellID, Trt)) where Trt=Litter|Cover|Compact
           #  - N.trt: df(col=c(CellID, Trt)) where Trt=Mech|Chem|MechChem
-          # The Trt levels in est.trt & N.trt have associated %'s hard coded
-          # in as parameters. 
-          # Thus, control.p is a list with the above df's as well as:
           #  - grd.trt: vector(Litter=p.est, Cover=p.est, Compact=p.est)
           #  - man.trt: vector(Mech=%kill, Chem=%kill, MechChem=%kill)
           #
           # For future complexity, manual.trt could also push a proportion of
           # the adults back to a previous age so they don't fruit for a number
           # of years after the treatment rather than being killed explicitly
-          # 
-          # The best approach probably partitions the calculations into separate
-          # functions and replaces the corresponding structure accordingly.
           
           # A. Adjust LC %
+          lc.trt <- NULL # to do
           
           # B. Adjust p.est
-          if(!is.null(est.trt)) {
+          if(nTrt_grd > 0) {
+            est.trt %<>% add_row(CellID=sample(1:ncell, nTrt_grd),
+                                 Trt=sample(c("Lit", "Cov", "Com"), 
+                                            nTrt_grd, replace=TRUE))
             pr.est.trt <- ground_trt(est.trt, grd.trt)
           }
           
           # C. Adjust N
-          if(!is.null(N.trt)) {
+          if(nTrt_man > 0) {
+            N.trt %<>% add_row(CellID=sample(1:ncell, nTrt_man),
+                               Trt=sample(c("M", "C", "MC"), 
+                                          nTrt_man, replace=TRUE))
             if(age.f.d) {
               N[,t,,] <- manual_trt(N.t, y.ad, N.trt, man.trt)
             } else {
@@ -540,12 +539,17 @@ ground_trt <- function(est.trt, grd.trt) {
 ##---
 manual_trt <- function(N.t, y.ad, N.trt, man.trt) {
   # given cells, treatments, and treatment effects: adjust N.adults
+  
+  # spraying probably has a %kill for all N
+  # some % die, some % get bumped back to juvenile
+  # effects on germination rates?
+  
   prop.kill <- tibble(id=N.trt$CellID,
                       prop=1-man.trt[match(N.trt$Trt, names(man.trt))])
   if(length(dim(N.t)) == 2) {
-    N.t[prop.kill$id,y.ad] <- round(N.t[prop.kill$id,y.ad] * prop.kill$prop)
+    N.t[prop.kill$id,] <- round(N.t[prop.kill$id,] * prop.kill$prop)
   } else {
-    N.t[prop.kill$id,,y.ad] <- round(N.t[prop.kill$id,,y.ad] * prop.kill$prop)
+    N.t[prop.kill$id,,] <- round(N.t[prop.kill$id,,] * prop.kill$prop)
   }
   return(N.t)
 }
