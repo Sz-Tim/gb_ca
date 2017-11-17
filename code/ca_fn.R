@@ -30,7 +30,7 @@
     dem.st <- g.p$dem.st
     sdd.st <- g.p$sdd.st
     bank <- g.p$bank
-    ncell <- g.p$lc.r * g.p$lc.c
+    ncell <- sum(lc.df$inbd)
     K <- g.p$K  # carrying capacity
     pr.s <- g.p$pr.s  # pre-adult survival
     pr.f <- g.p$pr.f  # pr(fruit)
@@ -49,8 +49,8 @@
     # If buckthorn is being actively managed...
     pr.est.trt <- NULL
     if(!is.null(control.p)) {
-      nTrt_grd <- control.p$nTrt_grd
-      nTrt_man <- control.p$nTrt_man
+      nTrt_grd <- control.p$nTrt_grd * ncell
+      nTrt_man <- control.p$nTrt_man * ncell
       grd.trt <- control.p$grd.trt
       man.trt <- control.p$man.trt
       t.trt <- control.p$t.trt
@@ -225,9 +225,9 @@
     bird.hab <- g.p$bird.hab
     
     # initialize landscape & storage objects
-    n.x <- max(lc.df[,1])
-    n.y <- max(lc.df[,2])
-    ncell <- n.x*n.y
+    n.x <- range(lc.df[,1])
+    n.y <- range(lc.df[,2])
+    ncell <- nrow(lc.df)
     nbr <- 2 * sdd.max + 1
     sdd.i <- array(0, dim=c(nbr, nbr, 2, ncell))
     bird.hab.ag <- as.matrix(lc.df[,4:9]) %*% (bird.hab %>% divide_by(sum(.)))
@@ -251,8 +251,8 @@
     yy <- map(lc.df$y, ~seq(.-sdd.max, .+sdd.max))
 
     # create lists of inbounds xy neighborhood ranges
-    n_ix <- map(xx, ~.[.>0 & .<=n.x])
-    n_iy <- map(yy, ~.[.>0 & .<=n.y])
+    n_ix <- map(xx, ~.[.>=n.x[1] & .<=n.x[2]])
+    n_iy <- map(yy, ~.[.>=n.y[1] & .<=n.y[2]])
     
     # generate all xy combinations & neighborhood matrix indices
     cat("generating neighborhoods...\n")
@@ -274,7 +274,10 @@
     cat("calculating probabilities...\n")
     for(n in 1:ncell) {
       # find cell ID for each cell in neighborhood
-      sdd.i[n_x[[n]][1]:n_x[[n]][2], n_y[[n]][1]:n_y[[n]][2],2,n] <- c_i[[n]]
+      sdd.i[n_y[[n]][1]:n_y[[n]][2],
+            n_x[[n]][1]:n_x[[n]][2],2,n] <- matrix(c_i[[n]], 
+                                                   ncol=diff(n_x[[n]])+1,
+                                                   byrow=TRUE)
       # weight by bird habitat preference
       ib <- sdd.i[,,2,n] != 0  # inbounds neighbors
       sdd.i[,,1,n][ib] <- d.pr[ib] * bird.hab.ag[sdd.i[,,2,n][ib]]
@@ -506,15 +509,17 @@ pop_init <- function(ncell, g.p, lc.df) {
   # Returns N.init: matrix (row=cell, col=age)
   # Or array (row=cell, col=LC, layer=age)
   
-  p.0 <- sample(1:ncell, g.p$N.p.t0)
+  p.0 <- sample(lc.df$id[lc.df$inbd], g.p$N.p.t0)
   y.ad <- max(g.p$age.f)  # adult age bin
   if(length(g.p$age.f) == 1) {
     N.init <- matrix(0, ncell, y.ad)  # column for each age class
-    N.init[p.0,y.ad] <- round(as.matrix(lc.df[p.0,4:9]) %*% (g.p$K/2))
+    N.init[p.0,y.ad] <- round(as.matrix(lc.df[lc.df$id %in% p.0,4:9]) %*% 
+                                (g.p$K/2))
     N.init[p.0,-y.ad] <- round(N.init[p.0,y.ad]/5)
   } else {
     N.init <- array(0, dim=c(ncell, g.p$n.lc, y.ad))
-    N.init[p.0,,y.ad] <- round(t(t(as.matrix(lc.df[p.0,4:9])) * g.p$K/2))
+    N.init[p.0,,y.ad] <- round(t(t(as.matrix(lc.df[lc.df$id %in% p.0,4:9])) * 
+                                   g.p$K/2))
     N.init[p.0,,-y.ad] <- round(N.init[p.0,,y.ad]/5)
   }
   return(N.init)
@@ -570,15 +575,15 @@ manual_trt <- function(N.t, y.ad, N.trt, man.trt) {
 ## make cell-block reference
 ##---
 make_cb_i <- function(blockSize) {
-  read_csv(paste0("data/roads_01_1a.csv")) %>% 
+  read_csv(paste0("data/roads_01_1a.csv")) %>%
     mutate(CellRow=1:n_distinct(top) %>% rep(n_distinct(left)),
            CellCol=1:n_distinct(left) %>% rep(each=n_distinct(top))) %>%
     filter((CellRow <= max((CellRow %/% blockSize) * blockSize)) &
              (CellCol <= max((CellCol %/% blockSize) * blockSize))) %>%
-    mutate(BlockRow=((CellRow-1)%/%blockSize)+1, 
+    mutate(BlockRow=((CellRow-1)%/%blockSize)+1,
            BlockCol=((CellCol-1)%/%blockSize)+1,
-           BlockID=paste(str_pad(BlockCol, 7, "left", "0"), 
-                         str_pad(BlockRow, 7, "left", "0"), sep=".") %>% 
+           BlockID=paste(str_pad(BlockCol, 7, "left", "0"),
+                         str_pad(BlockRow, 7, "left", "0"), sep=".") %>%
              as.numeric %>% factor %>% as.numeric) %>%
     select(c(CellID, CellRow, CellCol, BlockID, BlockRow, BlockCol, left, top))
 }
