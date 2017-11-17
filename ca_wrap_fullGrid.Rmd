@@ -1,0 +1,236 @@
+---
+title: "Glossy Buckthorn CA"
+author: "Tim Szewczyk"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+This is a wrapper for running the glossy buckthorn cellular automata model. It sets up the environment, allows the assignment of all necessary parameters, runs the simulation, and visualizes the results.
+
+The land cover within each cell is compositional rather than the more common hard classification. As a result, all land cover-specific parameters are computed proportionally to the land cover in a cell (i.e., lc.prop %*% K, where lc.prop is a matrix with columns for land cover and a row for each cell, and K is a vector of carrying capacities with one per land cover type).
+
+```{r setup, include=FALSE}
+if(!require(sevcheck)) devtools::install_github("Sz-Tim/sevcheck")
+p_load("tidyverse", "magrittr", "stringr", "parallel", 
+       "pbapply", "fastmatch", "gganimate")
+theme_set(theme_bw())
+source("code/ca_fn.R")
+```
+
+
+```{r setPars}
+##---
+## set parameters
+##---
+
+  set.seed(225)
+  n.sim <- 1
+  blockSize <- 4  # number of acres per block (width & height)
+  cb.i <- make_cb_i(blockSize); summary(cb.i)
+  g.p <- list(
+    # general
+    tmax=100,  # num time steps per simulation
+    simple=FALSE,  # simple lambda growth vs. fruits/seeds
+    dem.st=FALSE,  # include stochasticity in demography?
+    sdd.st=TRUE,  # include stochasticity in SDD?
+    n_cores=4,  # parallelize sdd.pr calculation
+    
+    # landscape
+    lc.r=102,  # num rows in landscape
+    lc.c=135,  # num columns in landscape
+    n.lc=6,  # num land cover categories
+    N.p.t0=50,  # num cells with buckthorn at t=1
+    
+    # demography
+    K=c(750, 10, 100, 100, 300, 100),  # K for adults
+    pr.s=c(0.9, 0.1, 0.6, 0.6, 0.6, 0.6),  # pre-adult survival
+    pr.f=c(0.9, 0.1, 0.29, 0.23, 0.2, 0.3),  # pr(fruit)
+    fec=c(200, 100, 40, 20, 20, 10),  # mean(fruit per adult)
+    age.f=rep(c(3,5), c(2,4)),  # age @ first fruiting (length==n.lc | 1)
+    bank=TRUE,  # include seedbank?
+    pr.sb=0.3,  # pr(ann.surv seed bank)
+    pr.est=c(0.07, 0.01, 0.08, 0.02, 0.02, 0.03),  # pr(seedling est)
+    lambda=c(1.5, 0.5, 1.0, 0.9, 1.2, 1.1),  # pop growth rate
+    
+    # dispersal
+    sdd.max=20,  # max dispersal distance (unit: cells)
+    sdd.rate=0.1,  # 1/mn for dispersal kernel
+    pr.eat=c(0.3, 0.1, 0.2, 0.2, 0.2, 0.1),  # pr(birds eat fruit)
+    bird.hab=c(.35, .35, 0.05, 0.1, 0.1, 0.05),  # bird habitat prefs
+    pr.s.bird=0.6,  # seed viability post-digestion
+    n.ldd=1   # num long distance dispersal events per year
+  )
+  ncell <- g.p$lc.r*g.p$lc.c
+  
+  control.p <- list(
+    nTrt_grd=0.05*ncell,
+    nTrt_man=0.05*ncell,
+    grd.trt=c(Lit=0.005, Cov=0.01, Com=0.00001),
+    man.trt=c(M=0.1, C=0.3, MC=0.8),
+    t.trt=50
+  )
+
+  
+
+##--
+## initialize landscape
+##--
+  
+  # land cover
+  Block.inc <- cb.i$BlockID[cb.i$BlockCol <= g.p$lc.c &
+                            cb.i$BlockRow <= g.p$lc.r] %>% unique
+  
+  grnt <- read_csv(paste0("data/out_01_1a_grnt.csv")) %>% 
+    mutate(CellID=1:nrow(.)) %>% add_blocks(cb.i=cb.i) %>% 
+    summarise(Dev=sum(V1)/n(), Oth=sum(V2)/n(), Hwd=sum(V3)/n(), 
+              WP=sum(V4)/n(), Evg=sum(V5)/n(), Mxd=sum(V6)/n()) %>%
+    filter(BlockID %in% Block.inc) 
+  
+  lc.df <- tibble(x=cb.i$BlockCol[match(grnt$BlockID, cb.i$BlockID)],
+                  y=cb.i$BlockRow[match(grnt$BlockID, cb.i$BlockID)],
+                  x_y=paste(x,y,sep="_"),
+                  Dev=grnt$Dev, Oth=grnt$Oth, Hwd=grnt$Hwd,
+                  WP=grnt$WP, Evg=grnt$Evg, Mxd=grnt$Mxd)
+  
+  # populations
+  N.init <- pop_init(ncell, g.p, lc.df)
+  
+  # dispersal probabilities
+  system.time(sdd.pr <- sdd_set_probs(lc.df, g.p))
+```
+
+```{r runSim}
+system.time(
+for(s in 1:n.sim) {
+  out <- run_sim(g.p, lc.df, sdd.pr, N.init, control.p)
+}
+)
+```
+
+
+```{r plots, fig.height=8, fig.width=10}
+out.sb <- log(out$N.sb+1)
+out.ad <- out$N[,,max(g.p$age.f)]
+N.out <- cbind(lc.df, out.ad) %>% as.tibble %>%
+  gather(year, N.adult, (1:ncol(out.ad)) + ncol(lc.df)) %>%
+  mutate(N.sb=c(out.sb),
+         N.less5=c(out.sb > 0))
+N.out$N.less5 <- N.out$N.less5 + c(out.ad > 5)
+N.out$year <- str_pad(N.out$year, 3, "left", "0")
+
+# final time step
+adult.ab.fin <- ggplot(filter(N.out, year==str_pad(g.p$tmax+1, 3, "left", "0")),
+                       aes(x=x, y=y, fill=N.adult)) +
+  geom_tile() + scale_fill_gradient(low="white", high="red") +
+  ggtitle(paste("Adult abundance. Year", g.p$tmax+1))
+sb.ab.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                    aes(x=x, y=y, fill=N.sb)) +
+  geom_tile() + scale_fill_gradient(low="white", high="red") +
+  ggtitle(paste("log seed abundance. Year", g.p$tmax+1))
+adult.pa.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                       aes(x=x, y=y, fill=N.adult>0)) +
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle(paste("Adult presence. Year", g.p$tmax+1))
+sb.pa.fin <- ggplot(filter(N.out, year==g.p$tmax+1), 
+                    aes(x=x, y=y, fill=N.sb>0)) +
+  geom_tile() + scale_fill_manual(values=c("FALSE"="white","TRUE"="red")) +
+  ggtitle(paste("Seed presence. Year", g.p$tmax+1))
+
+# gifs
+gifwd <- paste0("out/gifs/", ncell, "_t", g.p$tmax, "/")
+age.i <- ifelse(length(g.p$age.f)==1, 
+                paste0("age", g.p$age.f, ""),
+                paste0("ages", min(g.p$age.f), "-", max(g.p$age.f), ""))
+adult.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.adult, frame=year)) + 
+  geom_tile() + scale_fill_gradient(low="white", high="red") + 
+  ggtitle("Adult abundance. Year")
+sb.ab <- ggplot(N.out, aes(x=x, y=y, fill=N.sb, frame=year)) + 
+  geom_tile() + scale_fill_gradient(low="white", high="red") + 
+  ggtitle("log seed abundance. Year")
+adult.pa <- ggplot(N.out, aes(x=x, y=y, fill=N.adult>0, frame=year)) + 
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle("Adult presence. Year")
+sb.pa <- ggplot(N.out, aes(x=x, y=y, fill=N.sb > 0, frame=year)) + 
+  geom_tile() + scale_fill_manual(values=c("white","red")) + 
+  ggtitle("Seed presence. Year")
+adult.lo <- ggplot(N.out, aes(x=x, y=y, fill=N.less5, frame=year)) +
+  geom_tile() + ggtitle("Blue: Adult density ≤ 5. Year") + 
+  scale_fill_gradient2(low="white", mid="blue", high="pink", midpoint=1)
+
+# save plots
+ggsave(paste0(gifwd, "Final_Ab_", age.i, "TRT_allAge_persistent.jpg"), adult.ab.fin,
+       width=8, height=6, units="in")
+ggsave(paste0(gifwd, "Final_SB_Ab_", age.i, "TRT_allAge_persistent.jpg"), sb.ab.fin,
+       width=8, height=6, units="in")
+ggsave(paste0(gifwd, "Final_PA_", age.i, "TRT_allAge_persistent.jpg"), adult.pa.fin,
+       width=8, height=6, units="in")
+ggsave(paste0(gifwd, "Final_SB_PA_", age.i, "TRT_allAge_persistent.jpg"), sb.pa.fin,
+       width=8, height=6, units="in")
+gganimate(adult.ab, paste0(gifwd, "Ab_", age.i, "TRT_allAge_persistent.gif"), 
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(sb.ab, paste0(gifwd, "SB_Ab_", age.i, "TRT_allAge_persistent.gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(adult.pa, paste0(gifwd, "PA_", age.i, "TRT_allAge_persistent.gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(sb.pa, paste0(gifwd, "SB_PA_", age.i, "TRT_allAge_persistent.gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+gganimate(adult.lo, paste0(gifwd, "LoDens_", age.i, "TRT_allAge_persistent.gif"),
+          interval=0.2, ani.width=800, ani.height=600)
+
+# 
+# 
+# 
+# N.out$lam <- as.matrix(lc.df[,4:9]) %*% g.p$lambda
+# ggplot(N.out, aes(x=x, y=y, fill=lam)) + geom_tile() +
+#   scale_fill_gradient2(midpoint=1)
+# 
+# # land cover
+# p.dev <- ggplot(N.out, aes(x=x, y=y, fill=Dev)) + geom_tile() + 
+#   scale_fill_gradient(low="white", high="red", limits=c(0,1))
+# ggsave(paste0("out/plots/n_", ncell, "_LC_Dev.tif"), p.dev,
+#          width=10, height=7)
+# 
+# p.oth <- ggplot(N.out, aes(x=x, y=y, fill=Oth)) + geom_tile() + 
+#   scale_fill_gradient(low="white", high="gray30", limits=c(0,1))
+# ggsave(paste0("out/plots/n_", ncell, "_LC_Oth.jpg"), p.oth,
+#          width=10, height=7)
+# 
+# p.hwd <- ggplot(N.out, aes(x=x, y=y, fill=Hwd)) + geom_tile() + 
+#   scale_fill_gradient(low="white", high="green3", limits=c(0,1))
+# ggsave(paste0("out/plots/n_", ncell, "_LC_Hwd.jpg"), p.hwd,
+#          width=10, height=7)
+# 
+# p.wp <- ggplot(N.out, aes(x=x, y=y, fill=WP)) + geom_tile() + 
+#   scale_fill_gradient(low="white", high="orchid", limits=c(0,1))
+# ggsave(paste0("out/plots/n_", ncell, "_LC_WP.jpg"), p.wp,
+#          width=10, height=7)
+# 
+# p.evg <- ggplot(N.out, aes(x=x, y=y, fill=Evg)) + geom_tile() + 
+#   scale_fill_gradient(low="white", high="darkgreen", limits=c(0,1))
+# ggsave(paste0("out/plots/n_", ncell, "_LC_Evg.jpg"), p.evg,
+#          width=10, height=7)
+# 
+# p.mxd <- ggplot(N.out, aes(x=x, y=y, fill=Mxd)) + geom_tile() + 
+#   scale_fill_gradient(low="white", high="yellowgreen", limits=c(0,1))
+# ggsave(paste0("out/plots/n_", ncell, "_LC_Mxd.jpg"), p.mxd,
+#          width=10, height=7)
+# 
+# 
+# # buckthorn vs land cover
+# ggplot(N.out, aes(x=Dev)) + 
+#   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
+# ggplot(N.out, aes(x=Oth)) + 
+#   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
+# ggplot(N.out, aes(x=Hwd)) + 
+#   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
+# ggplot(N.out, aes(x=WP)) + 
+#   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
+# ggplot(N.out, aes(x=Evg)) + 
+#   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
+# ggplot(N.out, aes(x=Mxd)) + 
+#   geom_point(aes_string(y=paste0("t_", g.p$tmax)), alpha=0.1)
+```
+
+
+
+
