@@ -13,7 +13,8 @@
 ##---
 ## simulation wrapper
 ##---
-  run_sim <- function(g.p, lc.df, sdd.pr, N.init, control.p=NULL) {
+  run_sim <- function(ngrid, ncell, g.p, lc.df, sdd.pr, 
+                      N.init, control.p=NULL) {
     # Runs the simulation, calling subsequent submodules
     # simple=T runs model with no fruits/seeds/seedlings -- lambda only
     # Storage Structures:
@@ -30,7 +31,6 @@
     dem.st <- g.p$dem.st
     sdd.st <- g.p$sdd.st
     bank <- g.p$bank
-    ncell <- sum(lc.df$inbd)
     K <- g.p$K  # carrying capacity
     pr.s <- g.p$pr.s  # pre-adult survival
     pr.f <- g.p$pr.f  # pr(fruit)
@@ -45,6 +45,7 @@
     n.ldd <- g.p$n.ldd   # num long distance dispersal events per year
     y.ad <- max(g.p$age.f)
     age.f.d <- length(age.f) > 1
+    id_i <- lc.df %>% select(id, id_inbd)
     
     # If buckthorn is being actively managed...
     pr.est.trt <- NULL
@@ -86,9 +87,9 @@
       }
     } else {
       # 1. Initialize populations
-      N.sb <- matrix(0, nrow=ncell, ncol=tmax+1)
+      N.sb <- matrix(0, nrow=ngrid, ncol=tmax+1)
       if(age.f.d) {
-        N <- array(0, dim=c(ncell, tmax+1, n.lc, y.ad))  
+        N <- array(0, dim=c(ngrid, tmax+1, n.lc, y.ad))  
         N[,1,,] <- N.init
         for(l in 1:n.lc) {
           if(age.f[l] < y.ad) {
@@ -96,7 +97,7 @@
           }
         }
       } else {
-        N <- array(0, dim=c(ncell, tmax+1, y.ad))  
+        N <- array(0, dim=c(ngrid, tmax+1, y.ad))  
         N[,1,] <- N.init
       }
       
@@ -108,7 +109,7 @@
         }
         
         # 2. Implement management
-        if(!is.null(control.p) & t >= t.trt) {
+        if(!is.null(control.p) && t >= t.trt) {
           # run function to implement management controls
           # controls may be on whole cells or specific LCs of specific cells
           # controls may affect:
@@ -166,15 +167,16 @@
         
         # 5. Short distance dispersal
         cat("Dispersing locally...")
-        N.seed <- sdd_fs(N.f, pm$pr.eat.ag, sdd.pr, sdd.rate, sdd.st, pr.s.bird)
+        N.seed <- sdd_fs(id_i, N.f, pm$pr.eat.ag, pr.s.bird, 
+                         sdd.pr, sdd.rate, sdd.st)
         
         # 6. Long distance dispersal
         cat("Dispersing regionally...")
-        N.seed <- ldd_disperse(ncell, N.seed, n.ldd, simple=FALSE)
+        N.seed <- ldd_disperse(ncell, id_i, N.seed, n.ldd, simple=FALSE)
         
         # 7. Seedling establishment
         cat("Establishing...")
-        estab.out <- new_seedlings(ncell, N.seed, N.sb[,t], pm$pr.est.ag, 
+        estab.out <- new_seedlings(ngrid, N.seed, N.sb[,t], pm$pr.est.ag, 
                                    pr.sb, dem.st, bank)
         N.sb[,t+1] <- estab.out$N.sb
         
@@ -189,9 +191,9 @@
             N[,t+1,l,1] <- round(estab.out$N.rcrt * pm$rel.dens[,l])
           }
         } else {
-          N[,t+1,y.ad] <- pmin(round(N[,t,y.ad] + N[,t,y.ad-1] * pr.s.ag),
+          N[,t+1,y.ad] <- pmin(round(N[,t,y.ad] + N[,t,y.ad-1] * pm$pr.s.ag),
                                pm$K.ag)
-          N[,t+1,2:(y.ad-1)] <- round(N[,t,1:(y.ad-2)] * pr.s.ag)
+          N[,t+1,2:(y.ad-1)] <- round(N[,t,1:(y.ad-2)] * pm$pr.s.ag)
           N[,t+1,1] <- estab.out$N.rcrt
         }
       }
@@ -207,7 +209,7 @@
 ##---
 ## short distance dispersal probabilities
 ##---
-  sdd_set_probs <- function(lc.df, g.p) {
+  sdd_set_probs <- function(ncell, lc.df, g.p) {
     # Assign base dispersal probabilities from each cell
     # Each layer [1:i,1:j,,n] is the SDD neighborhood for cell n
     # trunc.diag: if TRUE, the sdd neighborhood is restricted to within sdd.max
@@ -227,7 +229,6 @@
     # initialize landscape & storage objects
     n.x <- range(lc.df[,1])
     n.y <- range(lc.df[,2])
-    ncell <- nrow(lc.df)
     nbr <- 2 * sdd.max + 1
     sdd.i <- array(0, dim=c(nbr, nbr, 2, ncell))
     bird.hab.ag <- as.matrix(lc.df[,4:9]) %*% (bird.hab %>% divide_by(sum(.)))
@@ -247,10 +248,10 @@
     d.pr <- d.pr/sum(d.pr)
     
     # pair cell IDs for each neighborhood; indexes match neighborhood matrix
-    xx <- map(lc.df$x, ~seq(.-sdd.max, .+sdd.max))
-    yy <- map(lc.df$y, ~seq(.-sdd.max, .+sdd.max))
+    xx <- map(lc.df$x[lc.df$inbd], ~seq(.-sdd.max, .+sdd.max))
+    yy <- map(lc.df$y[lc.df$inbd], ~seq(.-sdd.max, .+sdd.max))
 
-    # create lists of inbounds xy neighborhood ranges
+    # create lists of on-map xy neighborhood ranges
     n_ix <- map(xx, ~.[.>=n.x[1] & .<=n.x[2]])
     n_iy <- map(yy, ~.[.>=n.y[1] & .<=n.y[2]])
     
@@ -390,7 +391,8 @@
 ##---
 ## short distance dispersal: fruits & seeds
 ##---
-  sdd_fs <- function(N.f, pr.eat.ag, sdd.pr, sdd.rate, sdd.st=F, pr.s.bird) {
+  sdd_fs <- function(id_i, N.f, pr.eat.ag, pr.s.bird, 
+                     sdd.pr, sdd.rate, sdd.st=F) {
     # Calculate (N.seeds | N.fruit, sdd.probs, pr.eaten)
     # Accounts for distance from source cell, bird habitat preference,
     #   and the proportion of fruits eaten vs dropped
@@ -404,15 +406,16 @@
       mutate(N.produced=(2.3*N.fruit),
              N.emig=N.produced*(1-pexp(.5,sdd.rate))*pr.eat.ag[id,],
              N.drop=N.produced-N.emig) %>%
-      mutate(N.emig=N.emig*pr.s.bird)
+      mutate(N.emig=N.emig*pr.s.bird,
+             id_inbd=id_i$id_inbd[id])
     N.seed <- N.source %>% select(id, N.drop) %>% rename(N.dep=N.drop)
     
     if(sdd.st) {
       N.seed$N.dep <- round(N.seed$N.dep)
       SDD_sd <- unlist(apply(N.source, 1,
-                             function(x) sample(sdd.pr[,,2,x[1]], x[5], 
+                             function(x) sample(sdd.pr[,,2,x[7]], x[5], 
                                                 replace=TRUE,
-                                                prob=sdd.pr[,,1,x[1]])))
+                                                prob=sdd.pr[,,1,x[7]])))
       SDD_dep <- tabulate(SDD_sd)  # vector of counts for 1:max(SDD_sd)
       SDD_nonzero <- SDD_dep > 0  # cell id's with N_dep > 0
       N.seed <- add_row(N.seed, 
@@ -422,14 +425,15 @@
       # assign emigrants to target cells & sum within each cell
       N.seed %<>% 
         add_row(id=apply(N.source, 1, 
-                         function(x) c(sdd.pr[,,2,x[1]])) %>% c, 
+                         function(x) c(sdd.pr[,,2,x[7]])) %>% c, 
                 N.dep=apply(N.source, 1, 
-                            function(x) c(x[5] * sdd.pr[,,1,x[1]])) %>% c) %>%
+                            function(x) c(x[5] * sdd.pr[,,1,x[7]])) %>% c) %>%
         filter(N.dep > 0)
     }
     N.seed %<>%
       group_by(id) %>% 
-      summarise(N=sum(N.dep) %>% round)
+      summarise(N=sum(N.dep) %>% round) %>%
+      filter(!is.na(id_i$id_inbd[id]) & N > 0)
     return(N.seed)
   }
 
@@ -438,11 +442,12 @@
 ##---
 ## long distance dispersal
 ##---
-  ldd_disperse <- function(ncell, N.df, n.ldd, simple=TRUE) {
+  ldd_disperse <- function(ncell, id_i, N.df, n.ldd, simple=TRUE) {
     # Assign n.ldd random LDD events 
     # A single seed is added to n.ldd target cells
     
-    ldd.id <- sample(1:ncell, n.ldd, replace=TRUE)
+    ldd.id <- id_i$id[which(id_i$id_inbd == 
+                              sample(1:ncell, n.ldd, replace=TRUE))]
     if(simple) {
       N.df$N[N.df$id==ldd.id] <- N.df$N[N.df$id==ldd.id] + 1
     } else {
@@ -458,16 +463,16 @@
 ##---
 ## seed germination & establishment
 ##---
-  new_seedlings <- function(ncell, N.seed, N.sb, pr.est.ag, pr.sb,
+  new_seedlings <- function(ngrid, N.seed, N.sb, pr.est.ag, pr.sb,
                             dem.st=F, bank=F) {
     # Calculate (N.new | N.seed, pr.est)
     # Allows for incorporation of management effects & seedbank
     
-    N.rcrt <- rep(0, ncell)
+    N.rcrt <- rep(0, ngrid)
     if(dem.st) {
       N.rcrt[N.seed$id] <- rbinom(nrow(N.seed), N.seed$N, pr.est.ag[N.seed$id])
       if(bank) {
-        N.sbEst <- rep(0, ncell)
+        N.sbEst <- rep(0, ngrid)
         # N_est_sb
         N.sbEst[N.seed$id] <- rbinom(nrow(N.seed), N.sb[N.seed$id], 
                                      pr.est.ag[N.seed$id])
@@ -478,7 +483,7 @@
                                   N.sb[N.seed$id] + N.seed$N - N.rcrt[N.seed$id],
                                   pr.sb)
       } else {
-        N.sb <- rep(0, ncell)
+        N.sb <- rep(0, ngrid)
       }
     } else {
       # N_est = N_seed * p(est)
@@ -491,7 +496,7 @@
         N.sb[N.seed$id] <- ((N.sb[N.seed$id]*(1-pr.est.ag[N.seed$id,]) + 
                               N.seed$N - N.rcrt[N.seed$id]) * pr.sb) %>% round
       } else {
-        N.sb <- rep(0, ncell)
+        N.sb <- rep(0, ngrid)
       }
     }
     return(list(N.rcrt=N.rcrt, N.sb=N.sb))
@@ -502,7 +507,7 @@
 ##---
 ## initialize populations randomly
 ##---
-pop_init <- function(ncell, g.p, lc.df) {
+pop_init <- function(ngrid, g.p, lc.df) {
   # Initialize populations randomly
   # Adults: 50% K; Subadults: 10% K
   # Accounts for age.f constant vs varying by LC
@@ -512,7 +517,7 @@ pop_init <- function(ncell, g.p, lc.df) {
   p.0 <- sample(lc.df$id[lc.df$inbd], g.p$N.p.t0)
   y.ad <- max(g.p$age.f)  # adult age bin
   if(length(g.p$age.f) == 1) {
-    N.init <- matrix(0, ncell, y.ad)  # column for each age class
+    N.init <- matrix(0, ngrid, y.ad)  # column for each age class
     N.init[p.0,y.ad] <- round(as.matrix(lc.df[lc.df$id %in% p.0,4:9]) %*% 
                                 (g.p$K/2))
     N.init[p.0,-y.ad] <- round(N.init[p.0,y.ad]/5)
